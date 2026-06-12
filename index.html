@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>AllAcces – Gestion RH & Pointages + Attestations + Planification</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/otpauth@7.1.1/dist/otpauth.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root { --bg: #f4f6f9; --card-bg: #ffffff; --text: #212529; --navbar-bg: #1e2a38; --border: #dee2e6; --input-bg: #ffffff; }
+        body.dark { --bg: #1e1e2f; --card-bg: #2a2a3d; --text: #e0e0e0; --navbar-bg: #111; --border: #444; --input-bg: #2a2a3d; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; transition: background-color 0.3s, color 0.3s; }
+        .login-wrapper { min-height: 100vh; background-image: url('data:image/jpeg;base64,...'); background-size: cover; background-position: center; position: relative; overflow: hidden; }
+        .login-wrapper::before { content: ""; position: absolute; top:0;left:0;right:0;bottom:0; background: rgba(0,0,0,0.45); }
+        .login-card { backdrop-filter: blur(10px); background-color: rgba(255,255,255,0.85); border-radius: 32px; border: none; box-shadow: 0 25px 45px rgba(0,0,0,0.2); }
+        body.dark .login-card { background-color: rgba(30,30,47,0.85); color: #e0e0e0; }
+        .btn-custom { border-radius: 40px; padding: 12px 24px; font-weight: 600; letter-spacing: 0.5px; transition: all 0.3s ease; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .btn-custom:hover { transform: translateY(-2px); box-shadow: 0 8px 15px rgba(0,0,0,0.2); }
+        .btn-admin { background: linear-gradient(95deg, #0d6efd, #0a58ca); border: none; color: white; }
+        .btn-collab { background: linear-gradient(95deg, #198754, #146c43); border: none; color: white; }
+        .navbar { background-color: var(--navbar-bg); }
+        .card { background-color: var(--card-bg); border-color: var(--border); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .table { color: var(--text); }
+        .table td, .table th { border-color: var(--border); }
+        .form-control, .form-select { background-color: var(--input-bg); color: var(--text); border-color: var(--border); }
+        .keypad-btn { width: 60px; height: 60px; margin: 3px; font-size: 1.5rem; border-radius: 30px; transition: 0.2s; }
+        .keypad-btn:hover { transform: scale(1.05); background-color: #0d6efd; color: white; }
+        .modal-content { background-color: var(--card-bg); color: var(--text); }
+        .pause-badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:.78rem; font-weight:600; }
+        .pause-en-cours { background:#fff3cd; color:#856404; border:1px solid #ffc107; }
+        .pause-termine { background:#d1e7dd; color:#0a3622; border:1px solid #198754; }
+        .pause-dispo { background:#e2e3e5; color:#41464b; border:1px solid #adb5bd; }
+        .pause-depasse { background:#f8d7da; color:#842029; border:1px solid #dc3545; }
+        .live-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#198754; animation:pulse 1.2s infinite; margin-right:5px; }
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.3)} }
+        .timer-live { font-family:monospace; font-weight:700; font-size:.9rem; }
+        .btn-xs { padding:2px 6px; font-size:.75rem; border-radius:4px; }
+        .rh-card { border-radius:12px; border:1px solid var(--border); background:var(--card-bg); transition:box-shadow .2s; position:relative; }
+        .rh-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.12); }
+        .card-nortalis { background-color: #e8f5e9 !important; border-left: 5px solid #2e7d32; }
+        body.dark .card-nortalis { background-color: #1e3a2f !important; border-left-color: #4caf50; }
+        .badge-contrat-cdi    { background:#d1e7dd; color:#0a3622; }
+        .badge-contrat-cdd    { background:#fff3cd; color:#664d03; }
+        .badge-contrat-stage  { background:#cfe2ff; color:#084298; }
+        .badge-contrat-expire { background:#f8d7da; color:#842029; }
+        .org-dept { border-left:4px solid #0d6efd; padding-left:12px; margin-bottom:8px; }
+        .org-team { border-left:3px solid #198754; padding-left:10px; margin:4px 0 4px 16px; }
+        .org-member { padding:2px 0 2px 28px; font-size:.9rem; color:var(--text); opacity:.85; }
+        .leave-pending  { border-left:4px solid #ffc107; }
+        .leave-approved { border-left:4px solid #198754; }
+        .leave-rejected { border-left:4px solid #dc3545; }
+        .chef-badge { background:#0d6efd; color:#fff; font-size:.7rem; padding:1px 6px; border-radius:10px; }
+        .modal-rh { position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center; }
+        .modal-rh-box { background:var(--card-bg);border-radius:16px;padding:28px;width:min(96vw,620px);max-height:90vh;overflow-y:auto; }
+        .nav-tabs-scroll { display:flex; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:thin; border-bottom:1px solid var(--border); padding-bottom:0; gap:2px; }
+        .nav-tabs-scroll::-webkit-scrollbar { height:4px; }
+        .nav-tabs-scroll::-webkit-scrollbar-track { background:transparent; }
+        .nav-tabs-scroll::-webkit-scrollbar-thumb { background:#adb5bd; border-radius:2px; }
+        .nav-tabs-scroll .nav-item { flex-shrink:0; }
+        .nav-tabs-scroll .nav-link { white-space:nowrap; border-radius:6px 6px 0 0; padding:6px 12px; font-size:.85rem; color:var(--text); border:1px solid transparent; }
+        .nav-tabs-scroll .nav-link:hover { background:rgba(13,110,253,.08); }
+        .nav-tabs-scroll .nav-link.active { background:var(--card-bg); border-color:var(--border) var(--border) var(--card-bg); color:#0d6efd; font-weight:600; }
+        .missing-field { color:#dc3545; font-size:0.7rem; font-weight:bold; background:#fff0f0; display:inline-block; padding:2px 5px; border-radius:10px; margin-top:4px; }
+        .planning-card { background: var(--card-bg); border-left: 4px solid #0d6efd; }
+        .recommended-badge { background: #0d6efd20; color: #0d6efd; border-radius: 20px; padding: 2px 8px; font-size: 0.7rem; }
+        .search-box { margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .ops-block { margin-bottom: 30px; border: 1px solid var(--border); border-radius: 12px; padding: 15px; background: var(--card-bg); }
+        .ops-title { font-size: 1.2rem; font-weight: bold; border-left: 5px solid #0d6efd; padding-left: 10px; margin-bottom: 15px; }
+    </style>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+      import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, onSnapshot, writeBatch, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyAWzNWzWnrloCi5UqCaiRSxAKM91m3Gvz4",
+        authDomain: "allacees.firebaseapp.com",
+        projectId: "allacees",
+        storageBucket: "allacees.firebasestorage.app",
+        messagingSenderId: "871755472527",
+        appId: "1:871755472527:web:6e6baf3d027e3f4df21afa",
+        measurementId: "G-0NDMMRT4M6"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      window.db = db;
+      window.fsCollection = collection;
+      window.fsDoc = doc;
+      window.fsGetDocs = getDocs;
+      window.fsSetDoc = setDoc;
+      window.fsDeleteDoc = deleteDoc;
+      window.fsOnSnapshot = onSnapshot;
+      window.fsWriteBatch = writeBatch;
+      window.fsGetDoc = getDoc;
+      window.firebaseReady = true;
+      if (window._onFirebaseReady) window._onFirebaseReady();
+    </script>
+</head>
+<body>
+<nav class="navbar navbar-dark">
+    <div class="container-fluid">
+        <span class="navbar-brand"><i class="fas fa-clock me-2"></i>AllAcces – Gestion RH & Pointages</span>
+        <div class="d-flex gap-2">
+            <button id="btnRefreshAll" class="btn btn-outline-info btn-sm d-none" onclick="refreshAllTabs()"><i class="fas fa-sync-alt"></i> Actualiser</button>
+            <button id="btnLogout" class="btn btn-outline-light btn-sm"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
+        </div>
+    </div>
+</nav>
+
+<div id="app" class="container-fluid mt-3">
+    <!-- Écran de connexion -->
+    <div id="loginScreen" class="login-wrapper d-flex align-items-center justify-content-center" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:1000;">
+        <div class="col-md-5">
+            <div class="card login-card p-4">
+                <h4 class="text-center mb-4">Bienvenue sur <strong>AllAcces</strong></h4>
+                <div id="loginRole" class="d-grid gap-3">
+                    <button class="btn btn-custom btn-admin btn-lg" onclick="showAdminLogin()"><i class="fas fa-user-shield me-2"></i> Administration</button>
+                    <button class="btn btn-custom btn-collab btn-lg" onclick="showCollabLogin()"><i class="fas fa-user-clock me-2"></i> Collaborateur</button>
+                </div>
+                <div id="adminLoginForm" class="mt-3 d-none">
+                    <input type="password" id="adminPass" class="form-control mb-2" placeholder="Mot de passe admin" onkeydown="if(event.key==='Enter') loginAdmin()">
+                    <button class="btn btn-primary w-100 btn-custom" onclick="loginAdmin()">Valider</button>
+                    <div class="text-center mt-2"><a href="#" class="small text-muted" onclick="showResetPasswordModal()"><i class="fas fa-key"></i> Mot de passe oublié ?</a></div>
+                </div>
+                <div id="collabLoginForm" class="mt-3 d-none">
+                    <select id="collabSelect" class="form-select mb-2"></select>
+                    <div class="text-center mb-2">Code PIN</div>
+                    <div id="collabPinDisplay" class="text-center h4 border p-2 mb-2 rounded">****</div>
+                    <div id="keypadCollabLogin" class="d-flex flex-wrap justify-content-center"></div>
+                    <button class="btn btn-success w-100 mt-2 btn-custom" onclick="loginCollab()">Connexion</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panneau Admin -->
+    <div id="adminPanel" class="d-none">
+        <ul class="nav nav-tabs-scroll mb-3">
+            <li class="nav-item"><button type="button" class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabDashboard">📊 Tableau de bord</button></li>
+            <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#tabCollaborateurs">👤 Collaborateurs</button></li>
+            <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#tabEquipes">👥 Équipes</button></li>
+            <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#tabContrats">📋 Contrats</button></li>
+            <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPlanification">📅 Planification</button></li>
+            <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#tabConges">🏖️ Congés</button></li>
+            <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#tabSalaires">💰 Salaires</button></li>
+            <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#tabOrganigramme">🏢 Organigramme</button></li>
+            <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPointages">⏱️ Pointages</button></li>
+            <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#tabAbsences">❌ Absences</button></li>
+            <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#tabCommentaires">💬 Commentaires</button></li>
+            <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPauses"><span class="live-dot"></span>Pauses</button></li>
+            <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#tabRapports">📈 Rapports</button></li>
+            <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#tabParametres">⚙️ Paramètres</button></li>
+        </ul>
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="tabDashboard"></div>
+            <div class="tab-pane fade" id="tabCollaborateurs"><div class="search-box"><input type="text" id="searchCollab" class="form-control" placeholder="Rechercher..." style="width:250px"><button class="btn btn-primary btn-sm" onclick="showAddCollabModal()">Ajouter</button><button class="btn btn-success btn-sm" onclick="exportCollabsExcel()">Export Excel</button></div><div id="collabList"></div></div>
+            <div class="tab-pane fade" id="tabEquipes"></div>
+            <div class="tab-pane fade" id="tabContrats"><div class="search-box"><input type="text" id="searchContrat" class="form-control" placeholder="Rechercher collaborateur..." style="width:250px"><button class="btn btn-primary btn-sm" onclick="showAddContratModal()">Ajouter</button></div><div id="contratList"></div></div>
+            <div class="tab-pane fade" id="tabPlanification"></div>
+            <div class="tab-pane fade" id="tabConges"></div>
+            <div class="tab-pane fade" id="tabSalaires"><div class="search-box"><input type="text" id="searchSalaire" class="form-control" placeholder="Rechercher collaborateur..." style="width:250px"><button class="btn btn-success btn-sm" onclick="exportSalairesExcel()">Export Excel</button></div><div id="salaireList"></div></div>
+            <div class="tab-pane fade" id="tabOrganigramme"></div>
+            <div class="tab-pane fade" id="tabPointages"><div class="search-box"><input type="text" id="searchPointage" class="form-control" placeholder="Rechercher..." style="width:200px"><select id="filterStatus" class="form-select-sm"><option value="all">Tous</option><option value="complet">Complets</option><option value="incomplet">Incomplets</option><option value="depassement">Avec dépassement</option></select><button class="btn btn-sm btn-outline-secondary" onclick="showAddPointageModal()">Ajouter</button><button class="btn btn-sm btn-outline-success" onclick="exportPointagesGroupes()">Excel</button></div><div id="pointageList"></div></div>
+            <div class="tab-pane fade" id="tabAbsences"></div>
+            <div class="tab-pane fade" id="tabCommentaires"></div>
+            <div class="tab-pane fade" id="tabPauses"></div>
+            <div class="tab-pane fade" id="tabRapports"></div>
+            <div class="tab-pane fade" id="tabParametres"></div>
+        </div>
+    </div>
+
+    <!-- Panneau Collaborateur -->
+    <div id="collabPanel" class="d-none row justify-content-center">
+        <div class="col-md-8"><div class="card p-4" id="collabDashboard"></div></div>
+    </div>
+</div>
+
+<script>
+// ==================== MODÈLES DE DONNÉES ====================
+let collaborators = [];
+let pointages = [];
+let absences = [];
+let comments = [];
+let pauses = [];
+let teams = [];
+let contracts = [];
+let leaveRequests = [];
+let rhDocuments = [];
+let salaries = [];
+let plannings = [];
+let settings = { admin: { password: "admin123", email: "" }, theme: "light", securityMode: "totp" };
+let counters = { collab: 0, pointage: 0, absence: 0, comment: 0 };
+// Rotation par opération : objet { "Opération 01": [id1,id2,...], "Opération 08": [...] }
+let pauseRotationPerOp = {};
+
+const PAUSE_CONFIG = {
+    matin:    { label: 'Pause matin',    duree: 15,  icon: '☕', color: '#fd7e14' },
+    dejeuner: { label: 'Pause déjeuner', duree: 45,  icon: '🍽️', color: '#0d6efd' },
+    aprem:    { label: 'Pause après-midi', duree: 15, icon: '🧃', color: '#6f42c1' }
+};
+
+// ==================== FIREBASE HELPERS ====================
+async function fbSaveDoc(collectionName, id, data) {
+    if (!window.db) return;
+    try { await window.fsSetDoc(window.fsDoc(window.db, collectionName, String(id)), data); } catch(e) { console.error(e); }
+}
+async function fbDeleteDoc(collectionName, id) {
+    if (!window.db) return;
+    try { await window.fsDeleteDoc(window.fsDoc(window.db, collectionName, String(id))); } catch(e) { console.error(e); }
+}
+async function fbLoadCollection(collectionName) {
+    if (!window.db) return [];
+    try {
+        const snap = await window.fsGetDocs(window.fsCollection(window.db, collectionName));
+        return snap.docs.map(d => d.data());
+    } catch(e) { return []; }
+}
+async function saveAllData() {
+    if (!window.db) return;
+    ensurePauseRotation();
+    const batch = window.fsWriteBatch(window.db);
+    const saveList = [
+        { col: 'collaborators', arr: collaborators },
+        { col: 'pointages', arr: pointages },
+        { col: 'absences', arr: absences },
+        { col: 'comments', arr: comments },
+        { col: 'pauses', arr: pauses },
+        { col: 'teams', arr: teams },
+        { col: 'contracts', arr: contracts },
+        { col: 'leaveRequests', arr: leaveRequests },
+        { col: 'rhDocuments', arr: rhDocuments },
+        { col: 'salaries', arr: salaries },
+        { col: 'plannings', arr: plannings }
+    ];
+    for (const { col, arr } of saveList) {
+        for (const item of arr) {
+            if (item && item.id !== undefined) batch.set(window.fsDoc(window.db, col, String(item.id)), item);
+        }
+    }
+    batch.set(window.fsDoc(window.db, 'config', 'settings'), settings);
+    batch.set(window.fsDoc(window.db, 'config', 'counters'), counters);
+    try { await batch.commit(); } catch(e) { console.error(e); }
+}
+async function loadAllData() {
+    if (!window.db) return;
+    const [
+        collabsSnap, pointagesSnap, absencesSnap, commentsSnap, pausesSnap,
+        teamsSnap, contractsSnap, leavesSnap, docsSnap, salariesSnap, planningsSnap,
+        settingsSnap, countersSnap
+    ] = await Promise.all([
+        fbLoadCollection('collaborators'), fbLoadCollection('pointages'), fbLoadCollection('absences'),
+        fbLoadCollection('comments'), fbLoadCollection('pauses'), fbLoadCollection('teams'),
+        fbLoadCollection('contracts'), fbLoadCollection('leaveRequests'), fbLoadCollection('rhDocuments'),
+        fbLoadCollection('salaries'), fbLoadCollection('plannings'),
+        window.fsGetDoc(window.fsDoc(window.db, 'config', 'settings')).catch(()=>null),
+        window.fsGetDoc(window.fsDoc(window.db, 'config', 'counters')).catch(()=>null)
+    ]);
+    collaborators = collabsSnap;
+    pointages = pointagesSnap;
+    absences = absencesSnap;
+    comments = commentsSnap;
+    pauses = pausesSnap;
+    teams = teamsSnap;
+    contracts = contractsSnap;
+    leaveRequests = leavesSnap;
+    rhDocuments = docsSnap;
+    salaries = salariesSnap;
+    plannings = planningsSnap;
+    if (settingsSnap && settingsSnap.exists) settings = settingsSnap.data();
+    if (countersSnap && countersSnap.exists) counters = countersSnap.data();
+    if (collaborators.length === 0) await initDefaultData();
+    ensurePauseRotation();
+    for (const c of collaborators) {
+        if (!plannings.find(p => p.collaboratorId === c.id)) {
+            plannings.push({
+                id: `plan_${c.id}`,
+                collaboratorId: c.id,
+                startTime: "09:00",
+                endTime: "18:00",
+                breaks: [
+                    { type: "matin", start: "10:30", duration: 15 },
+                    { type: "dejeuner", start: "13:00", duration: 45 },
+                    { type: "aprem", start: "15:30", duration: 15 }
+                ]
+            });
+        }
+    }
+    await saveAllData();
+}
+async function initDefaultData() {
+    collaborators = [
+        { id: 1, name: "Alice Martin", prenom: "Alice", department: "Opération 01", poste: "Responsable commercial", phone: "0612345678", email: "alice@softcall.com", dateEntree: "2020-01-15", soldeConges: 22, pin: "1234", rib: "", cnss: "", totpSecret: generateTotpSecret(), totpActive: false, notes: "", company: "SOFTCALL" },
+        { id: 2, name: "Bob Dupont", prenom: "Bob", department: "Opération 08", poste: "Développeur", phone: "0698765432", email: "bob@softcall.com", dateEntree: "2021-06-01", soldeConges: 22, pin: "1234", rib: "TN987654321", cnss: "", totpSecret: generateTotpSecret(), totpActive: false, notes: "", company: "NORTALIS" },
+        { id: 3, name: "Claire Legrand", prenom: "Claire", department: "Opération 01", poste: "Assistante", phone: "0678901234", email: "claire@softcall.com", dateEntree: "2022-02-10", soldeConges: 22, pin: "1234", rib: "", cnss: "12348765", totpSecret: generateTotpSecret(), totpActive: false, notes: "", company: "SOFTCALL" }
+    ];
+    for (const c of collaborators) {
+        plannings.push({
+            id: `plan_${c.id}`,
+            collaboratorId: c.id,
+            startTime: "09:00",
+            endTime: "18:00",
+            breaks: [
+                { type: "matin", start: "10:30", duration: 15 },
+                { type: "dejeuner", start: "13:00", duration: 45 },
+                { type: "aprem", start: "15:30", duration: 15 }
+            ]
+        });
+    }
+    teams = [ { id: "team1", name: "Équipe commerciale", chefId: 1, members: [1,3], departement: "Opération 01" }, { id: "team2", name: "Équipe technique", chefId: 2, members: [2], departement: "Opération 08" } ];
+    contracts = [ { id: "ct1", collaboratorId: 1, type: "CDI", actif: true, dateDebut: "2020-01-15", dateFin: "", notes: "" }, { id: "ct2", collaboratorId: 2, type: "CDI", actif: true, dateDebut: "2021-06-01", dateFin: "", notes: "" }, { id: "ct3", collaboratorId: 3, type: "CDD", actif: true, dateDebut: "2022-02-10", dateFin: "2025-12-31", notes: "" } ];
+    leaveRequests = [ { id: "cg1", collaboratorId: 1, type: "Congé annuel", statut: "approuve", dateDebut: "2024-12-20", dateFin: "2025-01-05", nbJours: 10, motif: "Vacances", createdAt: "2024-12-01" } ];
+    salaries = [ { id: "sal_1", collaboratorId: 1, montant: 3500, devise: "TND", notes: "", updatedAt: "2025-01-01" }, { id: "sal_2", collaboratorId: 2, montant: 2800, devise: "TND", notes: "", updatedAt: "2025-01-01" }, { id: "sal_3", collaboratorId: 3, montant: 2000, devise: "TND", notes: "", updatedAt: "2025-01-01" } ];
+    settings = { admin: { password: "admin123", email: "" }, theme: "light", securityMode: "totp" };
+    counters = { collab: 3, pointage: 0, absence: 0, comment: 0 };
+    await saveAllData();
+}
+function generateTotpSecret() { const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let secret=''; for(let i=0;i<32;i++) secret+=chars[Math.floor(Math.random()*chars.length)]; return secret; }
+function verifyTotp(secret, token) { try { const totp = new OTPAuth.TOTP({ issuer: 'AllAcces', label: 'user', algorithm: 'SHA1', digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(secret) }); return totp.validate({ token, window: 1 }) === 0; } catch(e) { return false; } }
+async function getNextId(type) { counters[type] = (counters[type] || 0) + 1; if (window.db) await fbSaveDoc('config', 'counters', counters); return counters[type]; }
+function getTodayStr() { return new Date().toISOString().split('T')[0]; }
+function getNowStr() { return new Date().toTimeString().slice(0,5); }
+
+// ==================== AUTHENTIFICATION ====================
+let currentUser = null;
+let collabPinInput = "";
+function showAdminLogin() { document.getElementById('loginRole').classList.add('d-none'); document.getElementById('adminLoginForm').classList.remove('d-none'); document.getElementById('collabLoginForm').classList.add('d-none'); }
+function showCollabLogin() { document.getElementById('loginRole').classList.add('d-none'); document.getElementById('adminLoginForm').classList.add('d-none'); document.getElementById('collabLoginForm').classList.remove('d-none'); buildKeypad('keypadCollabLogin', digit => { if (collabPinInput.length < 4) { collabPinInput += digit; document.getElementById('collabPinDisplay').innerText = collabPinInput.padEnd(4, '*'); } }, () => { collabPinInput = collabPinInput.slice(0,-1); document.getElementById('collabPinDisplay').innerText = collabPinInput.padEnd(4, '*'); }); collabPinInput = ''; document.getElementById('collabPinDisplay').innerText = '****'; const select = document.getElementById('collabSelect'); if (select) select.innerHTML = '<option value="">-- Choisir --</option>' + collaborators.map(c => `<option value="${c.id}">${c.name}</option>`).join(''); }
+async function loginAdmin() { const pass = document.getElementById('adminPass').value; if (settings.admin.password === pass) { currentUser = { type: 'admin' }; await showInterface(); } else alert('Mot de passe incorrect'); }
+async function loginCollab() { const collabId = parseInt(document.getElementById('collabSelect').value); if (!collabId) return alert('Choisissez un nom'); const collab = collaborators.find(c => c.id === collabId); if (collab && collab.pin === collabPinInput) { currentUser = { type: 'collab', id: collab.id, name: collab.name }; await showInterface(); } else alert('PIN incorrect'); }
+function logout() { currentUser = null; document.getElementById('loginScreen').classList.remove('d-none'); document.getElementById('adminPanel').classList.add('d-none'); document.getElementById('collabPanel').classList.add('d-none'); document.getElementById('btnRefreshAll').classList.add('d-none'); document.getElementById('loginRole').classList.remove('d-none'); document.getElementById('adminLoginForm').classList.add('d-none'); document.getElementById('collabLoginForm').classList.add('d-none'); document.getElementById('adminPass').value = ''; }
+document.getElementById('btnLogout').addEventListener('click', logout);
+async function showInterface() { document.getElementById('loginScreen').classList.add('d-none'); if (currentUser.type === 'admin') { document.getElementById('adminPanel').classList.remove('d-none'); document.getElementById('collabPanel').classList.add('d-none'); document.getElementById('btnRefreshAll').classList.remove('d-none'); await loadAllData(); await renderAllAdminTabs(); startPausesRealtime(); } else { document.getElementById('collabPanel').classList.remove('d-none'); document.getElementById('adminPanel').classList.add('d-none'); document.getElementById('btnRefreshAll').classList.add('d-none'); await renderCollabDashboard(); } }
+async function renderAllAdminTabs() { renderDashboard(); renderCollaborateursList(); renderEquipes(); renderContratsList(); renderPlanification(); renderConges(); renderSalairesList(); renderOrganigramme(); renderPointagesList(); renderAbsences(); renderCommentaires(); renderPausesTab(); renderRapports(); renderParametres(); }
+
+// ==================== TABLEAU DE BORD ====================
+function renderDashboard() {
+    const today = getTodayStr();
+    const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - ((weekStart.getDay()+6)%7));
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+    const period = document.getElementById('dashboardPeriod')?.value || 'today';
+    const filterDate = p => period === 'week' ? (p.date >= weekStartStr && p.date <= today) : p.date === today;
+    const filtered = pointages.filter(filterDate);
+    const signedArr = filtered.filter(p => p.type === 'arrivee' && p.signe).length;
+    const absentCount = absences.filter(a => a.startDate <= today && a.endDate >= today).length;
+    const total = collaborators.length;
+    const presents = collaborators.filter(c => filtered.some(p => p.collaboratorId === c.id && p.type === 'arrivee' && p.signe)).length;
+    const nonPointes = Math.max(0, total - presents - absentCount);
+    const contratsExpires = contracts.filter(ct => ct.actif && ct.dateFin && new Date(ct.dateFin) < new Date());
+    const contratsSoon = contracts.filter(ct => { if (!ct.actif||!ct.dateFin) return false; const d=(new Date(ct.dateFin)-new Date())/86400000; return d>=0&&d<=30; });
+    const congesAttente = leaveRequests.filter(l => l.statut==='en_attente').length;
+    let html = `<div class="d-flex align-items-center mb-3 gap-2"><h5>Tableau de bord</h5><select id="dashboardPeriod" class="form-select form-select-sm w-auto" onchange="renderDashboard()"><option value="today" ${period==='today'?'selected':''}>Aujourd'hui</option><option value="week" ${period==='week'?'selected':''}>Cette semaine</option></select></div>
+    ${contratsExpires.length?`<div class="alert alert-danger py-2 mb-2">⚠️ ${contratsExpires.length} contrat(s) expiré(s)</div>`:''}
+    ${contratsSoon.length?`<div class="alert alert-warning py-2 mb-2">⚠️ ${contratsSoon.length} contrat(s) expirent dans 30j</div>`:''}
+    ${congesAttente?`<div class="alert alert-info py-2 mb-2">📋 ${congesAttente} demande(s) de congé en attente</div>`:''}
+    <div class="row g-3 mb-3"><div class="col-6 col-md-3"><div class="card p-3 text-center"><h6>Collaborateurs</h6><h2>${total}</h2></div></div>
+    <div class="col-6 col-md-3"><div class="card p-3 text-center"><h6>Présents</h6><h2 class="text-success">${presents}</h2></div></div>
+    <div class="col-6 col-md-3"><div class="card p-3 text-center"><h6>Absents</h6><h2 class="text-danger">${absentCount}</h2></div></div>
+    <div class="col-6 col-md-3"><div class="card p-3 text-center"><h6>Non pointés</h6><h2 class="text-warning">${nonPointes}</h2></div></div>
+    <div class="col-6 col-md-3"><div class="card p-3 text-center"><h6>Équipes</h6><h2>${teams.length}</h2></div></div>
+    <div class="col-6 col-md-3"><div class="card p-3 text-center"><h6>Contrats actifs</h6><h2>${contracts.filter(c=>c.actif).length}</h2></div></div>
+    <div class="col-6 col-md-3"><div class="card p-3 text-center"><h6>Congés en attente</h6><h2 class="text-warning">${congesAttente}</h2></div></div>
+    <div class="col-6 col-md-3"><div class="card p-3 text-center"><h6>Arrivées signées</h6><h2>${signedArr}</h2></div></div></div>
+    <div class="row"><div class="col-md-5"><canvas id="chartDashboard"></canvas></div>
+    <div class="col-md-7"><h6>Présence en temps réel</h6><div style="max-height:250px;overflow-y:auto">${
+        collaborators.filter(c => filtered.some(p=>p.collaboratorId===c.id&&p.type==='arrivee'&&p.signe)).map(c=>{
+            const team = teams.find(t=>t.members?.includes(c.id));
+            const pauseEc = pauses.find(p=>p.collaboratorId===c.id&&p.date===today&&p.debut&&!p.fin);
+            return `<div class="d-flex align-items-center gap-2 mb-1 p-1 border rounded"><span class="badge ${pauseEc?'bg-warning text-dark':'bg-success'}">${pauseEc?'Pause':'Présent'}</span><strong>${c.name}</strong><small class="text-muted">${team?.name||c.department||''}</small></div>`;
+        }).join('') || '<p class="text-muted">Aucun présent</p>'
+    }</div></div></div>`;
+    document.getElementById('tabDashboard').innerHTML = html;
+    new Chart(document.getElementById('chartDashboard'), { type: 'doughnut', data: { labels: ['Présents','Absents','Non pointés'], datasets: [{ data: [presents, absentCount, nonPointes], backgroundColor: ['#198754','#dc3545','#ffc107'] }] } });
+}
+
+// ==================== COLLABORATEURS ====================
+function getMissingFields(c) {
+    let missing = [];
+    if (!c.rib || c.rib.trim() === "") missing.push("RIB");
+    if (!c.cnss || c.cnss.trim() === "") missing.push("CNSS");
+    if (!c.email || c.email.trim() === "") missing.push("Email");
+    if (!c.phone || c.phone.trim() === "") missing.push("Téléphone");
+    if (!c.company) missing.push("Société");
+    return missing;
+}
+function renderCollaborateursList() {
+    const search = document.getElementById('searchCollab')?.value || '';
+    let list = collaborators;
+    if (search) list = list.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || (c.department||'').toLowerCase().includes(search.toLowerCase()));
+    const html = `
+    <div class="row g-3">
+        ${list.map(c => {
+            const contrat = contracts.find(ct => ct.collaboratorId === c.id && ct.actif);
+            const team = teams.find(t => t.members?.includes(c.id));
+            const isChef = teams.some(t => t.chefId === c.id);
+            const conges = getSoldeConges(c.id);
+            const present = pointages.some(p => p.collaboratorId === c.id && p.date === getTodayStr() && p.type === 'arrivee' && p.signe);
+            const missing = getMissingFields(c);
+            const missingAlert = missing.length ? `<div class="missing-field mt-1"><i class="fas fa-exclamation-triangle"></i> Champs manquants : ${missing.join(', ')}</div>` : '';
+            const cardClass = (c.company === 'NORTALIS') ? 'rh-card p-3 card-nortalis' : 'rh-card p-3';
+            return `<div class="col-md-4"><div class="${cardClass}">
+                <div class="d-flex justify-content-between"><div><strong>${c.name}</strong> ${isChef?'<span class="chef-badge">Chef</span>':''} <span class="badge ${present?'bg-success':'bg-secondary'}">${present?'Présent':'Absent'}</span><br><small class="text-muted">${c.company || '—'}</small></div>
+                <div><button class="btn btn-xs btn-outline-primary" onclick="showFicheCollab(${c.id})"><i class="fas fa-id-card"></i></button>
+                <button class="btn btn-xs btn-outline-warning" onclick="editCollab(${c.id})"><i class="fas fa-edit"></i></button>
+                <button class="btn btn-xs btn-outline-danger" onclick="deleteCollab(${c.id})"><i class="fas fa-trash"></i></button>
+                <button class="btn btn-xs btn-outline-info" onclick="showTotpQr(${c.id})" title="Configurer TOTP"><i class="fas fa-qrcode"></i></button></div></div>
+                <div class="small"><i class="fas fa-building"></i> Opération : ${c.department||'—'} ${team?`/ ${team.name}`:''}<br>
+                <i class="fas fa-phone"></i> ${c.phone||'—'}<br>
+                ${c.email?`<i class="fas fa-envelope"></i> ${c.email}<br>`:''}
+                ${c.poste?`<i class="fas fa-briefcase"></i> ${c.poste}<br>`:''}
+                ${contrat?`<span class="badge badge-contrat-${contrat.type.toLowerCase()}">${contrat.type}</span> ${contrat.dateFin?`jusqu'au ${contrat.dateFin}`:''}<br>`:''}
+                <i class="fas fa-euro-sign"></i> RIB: ${c.rib||'<span class="text-danger">manquant</span>'} &nbsp; <i class="fas fa-id-card"></i> CNSS: ${c.cnss||'<span class="text-danger">manquant</span>'}<br>
+                Congés restants: <strong>${conges.restants}j</strong> / ${conges.total}j
+                ${c.totpActive ? '<span class="badge bg-success">TOTP activé</span>' : '<span class="badge bg-danger">TOTP non activé</span>'}
+                ${missingAlert}
+                </div></div></div>`;
+        }).join('')}
+    </div>`;
+    document.getElementById('collabList').innerHTML = html;
+}
+function getSoldeConges(collabId) {
+    const c = collaborators.find(co => co.id === collabId);
+    const total = c?.soldeConges || 22;
+    const pris = leaveRequests.filter(l => l.collaboratorId === collabId && l.statut === 'approuve').reduce((s,l) => s + (l.nbJours || 0), 0);
+    return { total, pris, restants: total - pris };
+}
+function buildCollabForm(c) {
+    return `<div class="row g-2">
+        <div class="col-md-6"><label>Nom *</label><input class="form-control" id="cf_name" value="${c?.name||''}"></div>
+        <div class="col-md-6"><label>Prénom</label><input class="form-control" id="cf_prenom" value="${c?.prenom||''}"></div>
+        <div class="col-md-6"><label>Poste</label><input class="form-control" id="cf_poste" value="${c?.poste||''}"></div>
+        <div class="col-md-6"><label>Opération</label><input class="form-control" id="cf_dept" value="${c?.department||''}" placeholder="ex: Opération 01"></div>
+        <div class="col-md-6"><label>Téléphone *</label><input class="form-control" id="cf_phone" value="${c?.phone||''}"></div>
+        <div class="col-md-6"><label>Email *</label><input class="form-control" id="cf_email" value="${c?.email||''}"></div>
+        <div class="col-md-6"><label>CIN</label><input class="form-control" id="cf_cin" value="${c?.cin||''}"></div>
+        <div class="col-md-6"><label>RIB *</label><input class="form-control" id="cf_rib" value="${c?.rib||''}"></div>
+        <div class="col-md-6"><label>N° CNSS *</label><input class="form-control" id="cf_cnss" value="${c?.cnss||''}"></div>
+        <div class="col-md-6"><label>Date naissance</label><input type="date" class="form-control" id="cf_dob" value="${c?.dateNaissance||''}"></div>
+        <div class="col-md-6"><label>Date entrée</label><input type="date" class="form-control" id="cf_entree" value="${c?.dateEntree||''}"></div>
+        <div class="col-md-6"><label>Solde congés</label><input type="number" class="form-control" id="cf_conges" value="${c?.soldeConges||22}"></div>
+        <div class="col-md-6"><label>Genre</label><select class="form-select" id="cf_genre"><option value="">—</option><option value="H" ${c?.genre==='H'?'selected':''}>Homme</option><option value="F" ${c?.genre==='F'?'selected':''}>Femme</option></select></div>
+        <div class="col-md-6"><label>Société *</label><select class="form-select" id="cf_company"><option value="">-- Choisir --</option><option value="SOFTCALL" ${c?.company==='SOFTCALL'?'selected':''}>SOFTCALL</option><option value="NORTALIS" ${c?.company==='NORTALIS'?'selected':''}>NORTALIS</option></select></div>
+        <div class="col-12"><label>Adresse</label><input class="form-control" id="cf_adresse" value="${c?.adresse||''}"></div>
+        <div class="col-12"><label>Notes</label><textarea class="form-control" id="cf_notes" rows="2">${c?.notes||''}</textarea></div>
+    </div>`;
+}
+function readCollabForm() {
+    return {
+        name: document.getElementById('cf_name')?.value?.trim() || '',
+        prenom: document.getElementById('cf_prenom')?.value?.trim() || '',
+        poste: document.getElementById('cf_poste')?.value?.trim() || '',
+        department: document.getElementById('cf_dept')?.value?.trim() || '',
+        phone: document.getElementById('cf_phone')?.value?.trim() || '',
+        email: document.getElementById('cf_email')?.value?.trim() || '',
+        cin: document.getElementById('cf_cin')?.value?.trim() || '',
+        rib: document.getElementById('cf_rib')?.value?.trim() || '',
+        cnss: document.getElementById('cf_cnss')?.value?.trim() || '',
+        dateNaissance: document.getElementById('cf_dob')?.value || '',
+        dateEntree: document.getElementById('cf_entree')?.value || '',
+        soldeConges: parseInt(document.getElementById('cf_conges')?.value) || 22,
+        genre: document.getElementById('cf_genre')?.value || '',
+        company: document.getElementById('cf_company')?.value || '',
+        adresse: document.getElementById('cf_adresse')?.value?.trim() || '',
+        notes: document.getElementById('cf_notes')?.value?.trim() || ''
+    };
+}
+async function showAddCollabModal() {
+    openRhModal('Nouveau collaborateur', buildCollabForm(null), async () => {
+        const data = readCollabForm();
+        if (!data.name) return alert('Nom requis');
+        const newId = await getNextId('collab');
+        const totpSecret = generateTotpSecret();
+        const newCollab = { id: newId, pin: "1234", totpSecret, totpActive: false, ...data };
+        collaborators.push(newCollab);
+        plannings.push({
+            id: `plan_${newId}`,
+            collaboratorId: newId,
+            startTime: "09:00",
+            endTime: "18:00",
+            breaks: [
+                { type: "matin", start: "10:30", duration: 15 },
+                { type: "dejeuner", start: "13:00", duration: 45 },
+                { type: "aprem", start: "15:30", duration: 15 }
+            ]
+        });
+        await saveAllData();
+        renderCollaborateursList();
+        renderDashboard();
+        ensurePauseRotation();
+    });
+}
+async function editCollab(id) {
+    const c = collaborators.find(c => c.id === id);
+    openRhModal('Modifier collaborateur', buildCollabForm(c), async () => {
+        const data = readCollabForm();
+        if (!data.name) return alert('Nom requis');
+        Object.assign(c, data);
+        await saveAllData();
+        renderCollaborateursList();
+        ensurePauseRotation();
+    });
+}
+async function deleteCollab(id) {
+    if (!confirm('Supprimer ?')) return;
+    collaborators = collaborators.filter(c => c.id !== id);
+    pointages = pointages.filter(p => p.collaboratorId !== id);
+    absences = absences.filter(a => a.collaboratorId !== id);
+    comments = comments.filter(c => c.collaboratorId !== id);
+    pauses = pauses.filter(p => p.collaboratorId !== id);
+    contracts = contracts.filter(ct => ct.collaboratorId !== id);
+    leaveRequests = leaveRequests.filter(l => l.collaboratorId !== id);
+    salaries = salaries.filter(s => s.collaboratorId !== id);
+    plannings = plannings.filter(p => p.collaboratorId !== id);
+    teams.forEach(t => { if (t.chefId === id) t.chefId = null; t.members = t.members.filter(m => m !== id); });
+    await saveAllData();
+    renderCollaborateursList();
+    renderDashboard();
+    ensurePauseRotation();
+}
+function showFicheCollab(id) {
+    const c = collaborators.find(co => co.id === id);
+    const contrat = contracts.find(ct => ct.collaboratorId === id && ct.actif);
+    const team = teams.find(t => t.members?.includes(id));
+    const conges = getSoldeConges(id);
+    const mesConges = leaveRequests.filter(l => l.collaboratorId === id);
+    const sal = salaries.find(s => s.collaboratorId === id);
+    const planning = plannings.find(p => p.collaboratorId === id);
+    openRhModal(`Fiche RH — ${c.name}`, `<div class="row g-3"><div class="col-md-6"><h6>Informations personnelles</h6><table class="table table-sm">${[
+        ['CIN',c.cin],['Naissance',c.dateNaissance],['Genre',c.genre],['Téléphone',c.phone],['Email',c.email],['Adresse',c.adresse],['RIB',c.rib],['N° CNSS',c.cnss],['Société',c.company]
+    ].map(([l,v])=>`<tr><td class="text-muted">${l}</td><td>${v||'—'}</td></tr>`).join('')}</table></div>
+    <div class="col-md-6"><h6>Poste & structure</h6><table class="table table-sm">${[
+        ['Poste',c.poste],['Opération',c.department],['Équipe',team?.name],['Entrée',c.dateEntree],['Contrat',contrat?`${contrat.type} ${contrat.dateFin?'→'+contrat.dateFin:''}`:'—'],
+        ['Salaire',sal?`${sal.montant} ${sal.devise||'TND'}`:'—']
+    ].map(([l,v])=>`<tr><td class="text-muted">${l}</td><td>${v||'—'}</td></tr>`).join('')}</table></div>
+    <div class="col-12"><h6>Planning personnalisé</h6><table class="table table-sm"><tr><td class="text-muted">Début travail</td><td>${planning?.startTime||'09:00'}</td></tr>
+    <tr><td class="text-muted">Fin travail</td><td>${planning?.endTime||'18:00'}</td></tr>
+    <tr><td colspan="2"><strong>Pauses recommandées</strong></td></tr>
+    ${planning?.breaks.map(b => `<tr><td>${PAUSE_CONFIG[b.type]?.label||b.type}</td><td>${b.start} (${b.duration} min)</td></tr>`).join('') || '<tr><td colspan="2">Aucune</td></tr>'}
+    </table></div>
+    <div class="col-12"><h6>Congés — ${conges.restants}j restants / ${conges.total}j</h6><div class="progress mb-2"><div class="progress-bar bg-success" style="width:${Math.min(100,(conges.restants/conges.total)*100)}%"></div></div>
+    ${mesConges.length?`<table class="table table-sm"><thead><tr><th>Type</th><th>Du</th><th>Au</th><th>Jours</th><th>Statut</th></tr></thead><tbody>${mesConges.map(l=>`<tr><td>${l.type}</td><td>${l.dateDebut}</td><td>${l.dateFin}</td><td>${l.nbJours}</td><td><span class="badge ${l.statut==='approuve'?'bg-success':l.statut==='rejete'?'bg-danger':'bg-warning'}">${l.statut}</span></td></tr>`).join('')}</tbody></table>`:'<p class="text-muted">Aucun congé</p>'}</div>
+    <div class="col-12"><button class="btn btn-outline-info btn-sm" onclick="showTotpQr(${c.id})"><i class="fas fa-qrcode"></i> Configurer Google Authenticator (admin)</button>
+    <button class="btn btn-outline-primary btn-sm ms-2" onclick="genererAttestationPDF(${c.id})"><i class="fas fa-file-pdf"></i> Attestation PDF</button></div>
+    ${c.notes?`<div class="col-12"><h6>Notes</h6><p>${c.notes}</p></div>`:''}</div>`, null);
+}
+function showTotpQr(collabId) { const c = collaborators.find(c => c.id === collabId); if (!c) return; if (!c.totpSecret) { c.totpSecret = generateTotpSecret(); saveAllData(); } const totp = new OTPAuth.TOTP({ issuer: 'AllAcces', label: c.name, algorithm: 'SHA1', digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(c.totpSecret) }); const uri = totp.toString(); const qrSrc = `https://quickchart.io/qr?size=200x200&text=${encodeURIComponent(uri)}`; showModal('Configuration Google Authenticator (Admin)', `<p>Scannez ce QR code avec l'application du collaborateur :</p><img src="${qrSrc}" class="img-fluid"><p class="mt-2">Secret : <code>${c.totpSecret}</code></p><p>Entrez le code à 6 chiffres pour activer :</p><input type="text" id="totpActivationCode" class="form-control" placeholder="Code"><button class="btn btn-primary mt-2" onclick="activateTotp(${c.id})">Activer pour ce collaborateur</button><p class="text-danger">⚠️ L'activation doit être faite en présence du collaborateur.</p>`); }
+function activateTotp(collabId) { const c = collaborators.find(c => c.id === collabId); const code = document.getElementById('totpActivationCode')?.value; if (!code || code.length !== 6) { alert('Code 6 chiffres requis'); return; } if (verifyTotp(c.totpSecret, code)) { c.totpActive = true; saveAllData(); closeModal(); alert('TOTP activé avec succès !'); renderCollaborateursList(); if (currentUser && currentUser.type === 'collab' && currentUser.id === collabId) renderCollabDashboard(); } else { alert('Code invalide.'); } }
+function exportCollabsExcel() { const data = collaborators.map(c => { const contrat = contracts.find(ct => ct.collaboratorId === c.id && ct.actif); const team = teams.find(t => t.members?.includes(c.id)); const conges = getSoldeConges(c.id); return { 'Nom':c.name, 'Prénom':c.prenom, 'Poste':c.poste||'', 'Opération':c.department||'', 'Équipe':team?.name||'', 'Téléphone':c.phone||'', 'Email':c.email||'', 'CIN':c.cin||'', 'RIB':c.rib||'', 'CNSS':c.cnss||'', 'Date naissance':c.dateNaissance||'', 'Date entrée':c.dateEntree||'', 'Genre':c.genre||'', 'Société':c.company||'', 'Contrat':contrat?.type||'', 'Fin contrat':contrat?.dateFin||'', 'Congés total':conges.total, 'Congés pris':conges.pris, 'Congés restants':conges.restants, 'TOTP activé':c.totpActive ? 'Oui' : 'Non' }; }); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Collaborateurs'); XLSX.writeFile(wb, `collaborateurs_${getTodayStr()}.xlsx`); }
+
+// ==================== ÉQUIPES ====================
+function renderEquipes() { let html = `<div class="d-flex justify-content-between mb-3"><h5>Équipes</h5><button class="btn btn-primary btn-sm" onclick="showAddEquipeModal()">Créer une équipe</button></div><div class="row g-3">`; teams.forEach(t => { const chef = collaborators.find(c=>c.id===t.chefId); const members = (t.members||[]).map(id=>collaborators.find(c=>c.id===id)).filter(Boolean); html += `<div class="col-md-4"><div class="rh-card p-3"><div class="d-flex justify-content-between"><strong>${t.name}</strong><div><button class="btn btn-xs btn-warning" onclick="editEquipe('${t.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-xs btn-danger" onclick="deleteEquipe('${t.id}')"><i class="fas fa-trash"></i></button></div></div><div class="small"><i class="fas fa-user-tie"></i> Chef : ${chef?.name||'Non assigné'}</div><div>${members.map(m=>`<span class="badge bg-light text-dark border me-1 mb-1">${m.name}</span>`).join('')}</div><div class="text-muted small">${members.length} membre(s)</div><div><small>Opération : ${t.departement||'—'}</small></div></div></div>`; }); html += `</div>`; document.getElementById('tabEquipes').innerHTML = html; }
+function buildEquipeForm(t) { return `<div class="mb-2"><label>Nom de l'équipe *</label><input class="form-control" id="eq_name" value="${t?.name||''}"></div><div class="mb-2"><label>Opération</label><input class="form-control" id="eq_dept" value="${t?.departement||''}"></div><div class="mb-2"><label>Chef d'équipe</label><select class="form-select" id="eq_chef"><option value="">— Aucun —</option>${collaborators.map(c=>`<option value="${c.id}" ${t?.chefId===c.id?'selected':''}>${c.name}</option>`).join('')}</select></div><div class="mb-2"><label>Membres</label><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);padding:8px">${collaborators.map(c=>`<div class="form-check"><input class="form-check-input" type="checkbox" id="eq_m_${c.id}" value="${c.id}" ${(t?.members||[]).includes(c.id)?'checked':''}> <label for="eq_m_${c.id}">${c.name}</label></div>`).join('')}</div></div>`; }
+async function showAddEquipeModal() { openRhModal('Nouvelle équipe', buildEquipeForm(null), () => { const name = document.getElementById('eq_name')?.value?.trim(); if(!name) return alert('Nom requis'); const chefId = parseInt(document.getElementById('eq_chef')?.value) || null; const members = [...document.querySelectorAll('[id^="eq_m_"]:checked')].map(el=>parseInt(el.value)); const dept = document.getElementById('eq_dept')?.value?.trim() || ''; const id = 'team_'+Date.now(); teams.push({ id, name, chefId, members, departement: dept }); saveAllData(); renderEquipes(); renderCollaborateursList(); }); }
+async function editEquipe(id) { const t = teams.find(t=>t.id===id); openRhModal('Modifier équipe', buildEquipeForm(t), () => { t.name = document.getElementById('eq_name')?.value?.trim(); if(!t.name) return alert('Nom requis'); t.chefId = parseInt(document.getElementById('eq_chef')?.value) || null; t.members = [...document.querySelectorAll('[id^="eq_m_"]:checked')].map(el=>parseInt(el.value)); t.departement = document.getElementById('eq_dept')?.value?.trim() || ''; saveAllData(); renderEquipes(); renderCollaborateursList(); }); }
+async function deleteEquipe(id) { if(confirm('Supprimer cette équipe ?')) { teams = teams.filter(t=>t.id!==id); saveAllData(); renderEquipes(); } }
+
+// ==================== CONTRATS ====================
+function renderContratsList() {
+    const search = document.getElementById('searchContrat')?.value || '';
+    let list = contracts;
+    if(search) list = list.filter(ct=>collaborators.find(c=>c.id===ct.collaboratorId)?.name.toLowerCase().includes(search.toLowerCase()));
+    const soon = contracts.filter(ct=>ct.actif && ct.dateFin && (new Date(ct.dateFin)-new Date())/86400000 <=30 && (new Date(ct.dateFin)-new Date())/86400000 >=0);
+    let html = `<div class="alert alert-warning">⚠️ ${soon.length} contrat(s) expirant dans 30 jours : ${soon.map(ct=>collaborators.find(c=>c.id===ct.collaboratorId)?.name).join(', ')}</div><table class="table table-bordered"><thead class="table-dark"><tr><th>Collaborateur</th><th>Type</th><th>Date début</th><th>Date fin</th><th>Statut</th><th>Actions</th></tr></thead><tbody>`;
+    list.forEach(ct => { const c = collaborators.find(co=>co.id===ct.collaboratorId); const expire = ct.dateFin && new Date(ct.dateFin) < new Date(); html += `<tr class="${expire?'table-danger':''}"><td><strong>${c?.name||'?'}</strong></td><td><span class="badge ${expire?'badge-contrat-expire':`badge-contrat-${ct.type?.toLowerCase()}`}">${ct.type}</span></td><td>${ct.dateDebut||'—'}</td><td>${ct.dateFin||'Indéterminée'}</td><td>${expire?'Expiré':(ct.actif?'Actif':'Inactif')}</td><td><button class="btn btn-xs btn-warning" onclick="editContrat('${ct.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-xs btn-danger" onclick="deleteContrat('${ct.id}')"><i class="fas fa-trash"></i></button></td></tr>`; });
+    html += `</tbody></table>`; document.getElementById('contratList').innerHTML = html;
+}
+function buildContratForm(ct) { return `<div class="row g-2"><div class="col-12"><label>Collaborateur *</label><select id="ct_collab" class="form-select">${collaborators.map(c=>`<option value="${c.id}" ${ct?.collaboratorId===c.id?'selected':''}>${c.name}</option>`).join('')}</select></div><div class="col-md-6"><label>Type</label><select id="ct_type" class="form-select"><option value="CDI" ${ct?.type==='CDI'?'selected':''}>CDI</option><option value="CDD" ${ct?.type==='CDD'?'selected':''}>CDD</option><option value="Stage" ${ct?.type==='Stage'?'selected':''}>Stage</option></select></div><div class="col-md-6"><label>Actif</label><select id="ct_actif" class="form-select"><option value="true" ${ct?.actif!==false?'selected':''}>Actif</option><option value="false" ${ct?.actif===false?'selected':''}>Inactif</option></select></div><div class="col-md-6"><label>Date début</label><input type="date" id="ct_debut" class="form-control" value="${ct?.dateDebut||''}"></div><div class="col-md-6"><label>Date fin (vide = indéterminée)</label><input type="date" id="ct_fin" class="form-control" value="${ct?.dateFin||''}"></div><div class="col-12"><label>Notes</label><textarea id="ct_notes" class="form-control" rows="2">${ct?.notes||''}</textarea></div></div>`; }
+async function showAddContratModal() { openRhModal('Nouveau contrat', buildContratForm(null), () => { const collabId = parseInt(document.getElementById('ct_collab')?.value); if(!collabId) return alert('Collaborateur requis'); const id = 'ct_'+Date.now(); contracts.push({ id, collaboratorId: collabId, type: document.getElementById('ct_type')?.value || 'CDI', actif: document.getElementById('ct_actif')?.value === 'true', dateDebut: document.getElementById('ct_debut')?.value || '', dateFin: document.getElementById('ct_fin')?.value || '', notes: document.getElementById('ct_notes')?.value?.trim() || '' }); saveAllData(); renderContratsList(); renderCollaborateursList(); }); }
+async function editContrat(id) { const ct = contracts.find(c=>c.id===id); openRhModal('Modifier contrat', buildContratForm(ct), () => { ct.collaboratorId = parseInt(document.getElementById('ct_collab')?.value); ct.type = document.getElementById('ct_type')?.value; ct.actif = document.getElementById('ct_actif')?.value === 'true'; ct.dateDebut = document.getElementById('ct_debut')?.value; ct.dateFin = document.getElementById('ct_fin')?.value; ct.notes = document.getElementById('ct_notes')?.value?.trim() || ''; saveAllData(); renderContratsList(); renderCollaborateursList(); }); }
+async function deleteContrat(id) { if(confirm('Supprimer ce contrat ?')) { contracts = contracts.filter(c=>c.id!==id); saveAllData(); renderContratsList(); renderCollaborateursList(); } }
+
+// ==================== PLANIFICATION ====================
+function renderPlanification() { let html = `<div class="d-flex justify-content-between mb-3"><h5>Planification personnalisée des collaborateurs</h5><button class="btn btn-primary btn-sm" onclick="showEditAllPlannings()">Modifier tous</button></div><div class="row g-3">`; for (const c of collaborators) { const plan = plannings.find(p => p.collaboratorId === c.id); if (!plan) continue; html += `<div class="col-md-4"><div class="rh-card p-3"><div class="d-flex justify-content-between"><strong>${c.name}</strong> <span class="badge bg-secondary">${c.company||'—'}</span></div><table class="table table-sm mt-2"><tr><td class="text-muted">Arrivée prévue</td><td>${plan.startTime}</td></tr><tr><td class="text-muted">Départ prévue</td><td>${plan.endTime}</td></tr><tr><td colspan="2"><strong>Pauses recommandées</strong></td></tr>${plan.breaks.map(b => `<td><td>${PAUSE_CONFIG[b.type]?.label || b.type}</td><td>${b.start} (${b.duration} min)</td></tr>`).join('')}</table><button class="btn btn-sm btn-outline-primary" onclick="editPlanning(${c.id})"><i class="fas fa-edit"></i> Modifier planning</button></div></div>`; } html += `</div>`; document.getElementById('tabPlanification').innerHTML = html; }
+function editPlanning(collabId) { const c = collaborators.find(c => c.id === collabId); const plan = plannings.find(p => p.collaboratorId === collabId); if (!plan) return; const breaksHtml = ['matin','dejeuner','aprem'].map(type => { const b = plan.breaks.find(b => b.type === type) || { type, start: "12:00", duration: PAUSE_CONFIG[type].duree }; return `<div class="row g-2 mb-2"><div class="col-4"><label>${PAUSE_CONFIG[type].label}</label></div><div class="col-4"><input type="time" class="form-control" id="break_${type}_start" value="${b.start}"></div><div class="col-4"><input type="number" class="form-control" id="break_${type}_dur" value="${b.duration}" step="5" min="0"></div></div>`; }).join(''); const form = `<div class="row g-2"><div class="col-6"><label>Heure d'arrivée prévue</label><input type="time" id="plan_start" class="form-control" value="${plan.startTime}"></div><div class="col-6"><label>Heure de départ prévue</label><input type="time" id="plan_end" class="form-control" value="${plan.endTime}"></div><div class="col-12"><h6>Pauses recommandées</h6>${breaksHtml}</div></div>`; openRhModal(`Planning de ${c.name}`, form, () => { plan.startTime = document.getElementById('plan_start').value; plan.endTime = document.getElementById('plan_end').value; for (const type of ['matin','dejeuner','aprem']) { const b = plan.breaks.find(b => b.type === type); if (b) { b.start = document.getElementById(`break_${type}_start`).value; b.duration = parseInt(document.getElementById(`break_${type}_dur`).value); } else { plan.breaks.push({ type, start: document.getElementById(`break_${type}_start`).value, duration: parseInt(document.getElementById(`break_${type}_dur`).value) }); } } saveAllData(); renderPlanification(); if (currentUser.type === 'collab' && currentUser.id === collabId) renderCollabDashboard(); }); }
+function showEditAllPlannings() { alert("Vous pouvez modifier chaque planning individuellement."); }
+
+// ==================== CONGÉS ====================
+function renderConges(filterStatut='all') { let list = leaveRequests; if(filterStatut!=='all') list = list.filter(l=>l.statut===filterStatut); const pending = leaveRequests.filter(l=>l.statut==='en_attente').length; let html = `<div class="d-flex flex-wrap justify-content-between mb-3"><h5>Congés ${pending?`<span class="badge bg-warning text-dark">${pending} en attente</span>`:''}</h5><div><select onchange="renderConges(this.value)" class="form-select-sm" style="width:160px"><option value="all">Tous</option><option value="en_attente">En attente</option><option value="approuve">Approuvés</option><option value="rejete">Rejetés</option></select> <button class="btn btn-primary btn-sm" onclick="showAddCongeModal()">Ajouter</button></div></div><div class="row g-2">`; list.forEach(l => { const c = collaborators.find(co=>co.id===l.collaboratorId); const statusClass = l.statut==='approuve'?'leave-approved':l.statut==='rejete'?'leave-rejected':'leave-pending'; const badgeClass = l.statut==='approuve'?'bg-success':l.statut==='rejete'?'bg-danger':'bg-warning text-dark'; html += `<div class="col-md-6"><div class="rh-card p-3 ${statusClass}"><div class="d-flex justify-content-between"><div><strong>${c?.name||'?'}</strong> <span class="badge ${badgeClass}">${l.statut.replace('_',' ')}</span></div><div>${l.statut==='en_attente'?`<button class="btn btn-xs btn-success" onclick="validerConge('${l.id}','approuve')"><i class="fas fa-check"></i></button> <button class="btn btn-xs btn-danger" onclick="validerConge('${l.id}','rejete')"><i class="fas fa-times"></i></button>`:''}<button class="btn btn-xs btn-danger" onclick="deleteConge('${l.id}')"><i class="fas fa-trash"></i></button></div></div><div class="small mt-1"><span class="badge bg-secondary">${l.type}</span> ${l.dateDebut} → ${l.dateFin} <strong>(${l.nbJours}j)</strong></div>${l.motif?`<div class="small text-muted mt-1">${l.motif}</div>`:''}</div></div>`; }); html += `</div>`; document.getElementById('tabConges').innerHTML = html; }
+function buildCongeForm() { return `<div class="row g-2"><div class="col-12"><label>Collaborateur *</label><select id="cg_collab" class="form-select">${collaborators.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div><div class="col-md-6"><label>Type</label><select id="cg_type" class="form-select"><option>Congé annuel</option><option>Maladie</option><option>Sans solde</option><option>RTT</option></select></div><div class="col-md-6"><label>Statut</label><select id="cg_statut" class="form-select"><option value="en_attente">En attente</option><option value="approuve">Approuvé</option><option value="rejete">Rejeté</option></select></div><div class="col-md-6"><label>Date début *</label><input type="date" id="cg_debut" class="form-control" oninput="calcNbJours()"></div><div class="col-md-6"><label>Date fin *</label><input type="date" id="cg_fin" class="form-control" oninput="calcNbJours()"></div><div class="col-12"><label>Nombre de jours ouvrés</label><input type="number" id="cg_jours" class="form-control" step="0.5" value="1"></div><div class="col-12"><label>Motif</label><textarea id="cg_motif" class="form-control" rows="2"></textarea></div></div>`; }
+function calcNbJours() { const d = document.getElementById('cg_debut')?.value, f = document.getElementById('cg_fin')?.value; if(!d||!f) return; let count=0, cur=new Date(d+'T00:00:00'), end=new Date(f+'T00:00:00'); while(cur<=end){const day=cur.getDay(); if(day!==0&&day!==6) count++; cur.setDate(cur.getDate()+1);} const el=document.getElementById('cg_jours'); if(el) el.value=count; }
+async function showAddCongeModal() { openRhModal('Nouvelle demande de congé', buildCongeForm(), () => { const collabId = parseInt(document.getElementById('cg_collab')?.value); if(!collabId) return alert('Collaborateur requis'); const dateDebut = document.getElementById('cg_debut')?.value, dateFin = document.getElementById('cg_fin')?.value; if(!dateDebut||!dateFin) return alert('Dates requises'); const id = 'cg_'+Date.now(); leaveRequests.push({ id, collaboratorId: collabId, type: document.getElementById('cg_type')?.value, statut: document.getElementById('cg_statut')?.value, dateDebut, dateFin, nbJours: parseFloat(document.getElementById('cg_jours')?.value) || 1, motif: document.getElementById('cg_motif')?.value?.trim() || '', createdAt: getTodayStr() }); saveAllData(); renderConges(); renderCollaborateursList(); }); }
+async function validerConge(id, statut) { const l = leaveRequests.find(l=>l.id===id); if(l) { l.statut = statut; saveAllData(); renderConges(); renderCollaborateursList(); } }
+async function deleteConge(id) { if(confirm('Supprimer cette demande ?')) { leaveRequests = leaveRequests.filter(l=>l.id!==id); saveAllData(); renderConges(); renderCollaborateursList(); } }
+
+// ==================== SALAIRES ====================
+function renderSalairesList() {
+    const search = document.getElementById('searchSalaire')?.value || '';
+    let list = collaborators;
+    if(search) list = list.filter(c=>c.name.toLowerCase().includes(search.toLowerCase()));
+    let html = `<table class="table table-bordered"><thead class="table-dark"><tr><th>Collaborateur</th><th>Poste</th><th>Salaire brut</th><th>Devise</th><th>Dernière maj</th><th>Actions</th></tr></thead><tbody>`;
+    list.forEach(c => { const sal = salaries.find(s=>s.collaboratorId===c.id); html += `<tr><td><strong>${c.name}</strong></td><td>${c.poste||'—'}</td><td>${sal?`<strong>${sal.montant}</strong>`:'—'}</td><td>${sal?.devise||'TND'}</td><td>${sal?.updatedAt||'—'}</td><td><button class="btn btn-xs btn-primary" onclick="editSalaire(${c.id})"><i class="fas fa-edit"></i> Modifier</button></td></tr>`; });
+    html += `</tbody></table>`; document.getElementById('salaireList').innerHTML = html;
+}
+async function editSalaire(collabId) { const c = collaborators.find(co=>co.id===collabId); const sal = salaries.find(s=>s.collaboratorId===collabId); openRhModal(`Salaire — ${c.name}`, `<div class="row g-2"><div class="col-md-6"><label>Salaire brut *</label><input type="number" id="sal_montant" class="form-control" value="${sal?.montant||''}"></div><div class="col-md-6"><label>Devise</label><select id="sal_devise" class="form-select"><option value="TND" ${sal?.devise==='TND'||!sal?'selected':''}>TND</option><option value="EUR" ${sal?.devise==='EUR'?'selected':''}>EUR</option><option value="USD" ${sal?.devise==='USD'?'selected':''}>USD</option></select></div><div class="col-12"><label>Notes</label><textarea id="sal_notes" class="form-control" rows="2">${sal?.notes||''}</textarea></div></div>`, () => { const montant = parseFloat(document.getElementById('sal_montant')?.value); if(isNaN(montant)) return alert('Montant invalide'); const id = `sal_${collabId}`; const existing = salaries.find(s=>s.collaboratorId===collabId); const newSal = { id, collaboratorId: collabId, montant, devise: document.getElementById('sal_devise')?.value || 'TND', notes: document.getElementById('sal_notes')?.value?.trim() || '', updatedAt: getTodayStr() }; if(existing) Object.assign(existing, newSal); else salaries.push(newSal); saveAllData(); renderSalairesList(); }); }
+function exportSalairesExcel() { const data = collaborators.map(c => { const sal = salaries.find(s=>s.collaboratorId===c.id); const team = teams.find(t=>t.members?.includes(c.id)); return { 'Collaborateur':c.name, 'Poste':c.poste||'', 'Opération':c.department||'', 'Équipe':team?.name||'', 'Salaire brut':sal?.montant||'', 'Devise':sal?.devise||'TND', 'Notes':sal?.notes||'' }; }); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Salaires'); XLSX.writeFile(wb, `salaires_${getTodayStr()}.xlsx`); }
+
+// ==================== ORGANIGRAMME ====================
+function renderOrganigramme() { const depts = {}; collaborators.forEach(c => { const d = c.department || 'Non défini'; if(!depts[d]) depts[d] = { collabs: [], teams: [] }; depts[d].collabs.push(c); }); teams.forEach(t => { const dept = t.departement || 'Non défini'; if(!depts[dept]) depts[dept] = { collabs: [], teams: [] }; depts[dept].teams.push(t); }); let html = `<div class="d-flex justify-content-between mb-3"><h5>🏢 Organigramme</h5><small>${collaborators.length} collaborateurs · ${teams.length} équipes · ${Object.keys(depts).length} opérations</small></div>`; for(const [dept, data] of Object.entries(depts)) { const deptTeams = data.teams; const memberIds = new Set(deptTeams.flatMap(t=>t.members||[])); const noTeam = data.collabs.filter(c=>!memberIds.has(c.id)); html += `<div class="org-dept mb-3"><div class="d-flex gap-2 mb-2"><i class="fas fa-building text-primary"></i><strong>${dept}</strong><span class="badge bg-primary">${data.collabs.length}</span></div>`; for(const t of deptTeams) { const chef = collaborators.find(c=>c.id===t.chefId); const members = (t.members||[]).map(id=>collaborators.find(c=>c.id===id)).filter(Boolean); html += `<div class="org-team"><div class="d-flex gap-2 mb-1"><i class="fas fa-users text-success"></i><strong>${t.name}</strong>${chef?`<span class="text-muted small">— Chef : <strong>${chef.name}</strong></span>`:''}<span class="badge bg-success">${members.length}</span></div>`; for(const m of members) { html += `<div class="org-member d-flex gap-2"><i class="fas fa-user-circle text-muted"></i><span>${m.name}</span>${m.poste?`<small class="text-muted">(${m.poste})</small>`:''}${t.chefId===m.id?'<span class="chef-badge">Chef</span>':''}</div>`; } html += `</div>`; } if(noTeam.length) html += `<div class="org-team"><div class="text-muted small mb-1"><i class="fas fa-user me-1"></i>Sans équipe assignée</div>${noTeam.map(m=>`<div class="org-member">${m.name} ${m.poste?`<small class="text-muted">(${m.poste})</small>`:''}</div>`).join('')}</div>`; html += `</div>`; } document.getElementById('tabOrganigramme').innerHTML = html; }
+
+// ==================== POINTAGES ====================
+function renderPointagesList() {
+    const filterText = document.getElementById('searchPointage')?.value || '';
+    const filterStatus = document.getElementById('filterStatus')?.value || 'all';
+    const pairs = {};
+    pointages.forEach(p => {
+        const key = `${p.collaboratorId}_${p.date}`;
+        if(!pairs[key]) pairs[key] = { collaboratorId: p.collaboratorId, date: p.date, arrivee: null, depart: null };
+        if(p.type === 'arrivee') pairs[key].arrivee = p;
+        else if(p.type === 'depart') pairs[key].depart = p;
+    });
+    let rows = Object.values(pairs).map(r => {
+        const c = collaborators.find(co => co.id === r.collaboratorId);
+        const com = comments.find(co => co.collaboratorId === r.collaboratorId && co.date === r.date);
+        const h = computeHeuresNettes(r.collaboratorId, r.date);
+        return { ...r, collabName: c?.name || '?', dept: c?.department || '—', commentText: com?.text || '', heures: h };
+    });
+    if(filterText) rows = rows.filter(r => r.collabName.toLowerCase().includes(filterText.toLowerCase()));
+    if(filterStatus === 'complet') rows = rows.filter(r => r.arrivee?.signe && r.depart?.signe);
+    else if(filterStatus === 'incomplet') rows = rows.filter(r => !r.arrivee?.signe || !r.depart?.signe);
+    else if(filterStatus === 'depassement') rows = rows.filter(r => r.heures && r.heures.depassement > 0);
+    rows.sort((a,b)=>b.date.localeCompare(a.date) || a.collabName.localeCompare(b.collabName));
+    const totalJours = rows.length;
+    const totalNetMin = rows.reduce((acc,r)=>acc+(r.heures?r.heures.nettes*60:0),0);
+    const totalDepMin = rows.reduce((acc,r)=>acc+(r.heures?r.heures.depassement*60:0),0);
+    const nbDep = rows.filter(r=>r.heures&&r.heures.depassement>0).length;
+    const fmtCell = (p) => {
+        if(!p) return '<span class="text-muted">—</span>';
+        const sig = p.signe ? '<span class="text-success ms-1">✓</span>' : '<span class="text-danger ms-1">⌛</span>';
+        return `<strong>${p.time}</strong>${sig}`;
+    };
+    let html = `<div class="row g-2 mb-3"><div class="col-3"><div class="card p-2 text-center"><small>Journées</small><div class="fw-bold">${totalJours}</div></div></div>
+    <div class="col-3"><div class="card p-2 text-center"><small>Heures nettes</small><div class="fw-bold text-success">${formatHeures(totalNetMin/60)}</div></div></div>
+    <div class="col-3"><div class="card p-2 text-center"><small>Dépassements</small><div class="fw-bold text-danger">${Math.round(totalDepMin)}min</div></div></div>
+    <div class="col-3"><div class="card p-2 text-center"><small>Jours avec dép.</small><div class="fw-bold text-warning">${nbDep}</div></div></div></div>
+    <div class="table-responsive"><table class="table table-bordered"><thead class="table-dark"><tr><th>Collaborateur</th><th>Opération</th><th>Date</th><th>Arrivée</th><th>Départ</th><th>Temps brut</th><th>Dép. pause</th><th>Temps net</th><th>Commentaire</th><th>Actions</th></tr></thead><tbody>`;
+    rows.forEach(r => {
+        const h = r.heures;
+        const depMin = h?Math.round(h.depassement*60):0;
+        const brutCell = h?formatHeures(h.brutes):'—';
+        const depCell = depMin>0?`<span class="badge bg-danger">-${depMin}min</span>`:'—';
+        const netCell = h?`<strong class="${h.depassement>0?'text-danger':'text-success'}">${formatHeures(h.nettes)}</strong>`:'—';
+        html += `<tr><td><strong>${r.collabName}</strong></td><td><small>${r.dept}</small></td><td>${r.date}</td><td>${fmtCell(r.arrivee)}</td><td>${fmtCell(r.depart)}</td><td>${brutCell}</td><td>${depCell}</td><td>${netCell}</td><td><small>${r.commentText||''}</small></td>
+        <td class="text-nowrap">${r.arrivee?`<button class="btn btn-xs btn-outline-success" onclick="signFromAdmin(${r.collaboratorId},'${r.date}','arrivee')"><i class="fas fa-pen"></i></button>`:''}
+        ${r.depart?`<button class="btn btn-xs btn-outline-danger" onclick="signFromAdmin(${r.collaboratorId},'${r.date}','depart')"><i class="fas fa-pen"></i></button>`:''}
+        ${r.arrivee?`<button class="btn btn-xs btn-outline-warning" onclick="editPointage('${r.arrivee.id}')"><i class="fas fa-edit"></i></button>`:''}
+        ${r.depart?`<button class="btn btn-xs btn-outline-warning" onclick="editPointage('${r.depart.id}')"><i class="fas fa-edit"></i></button>`:''}
+        ${r.arrivee?`<button class="btn btn-xs btn-outline-danger" onclick="deletePointage('${r.arrivee.id}')"><i class="fas fa-trash"></i></button>`:''}</td></tr>`;
+    });
+    html += `</tbody></table></div>`;
+    document.getElementById('pointageList').innerHTML = html;
+}
+function exportPointagesGroupes() {
+    const pairs = {};
+    pointages.forEach(p => { const key = `${p.collaboratorId}_${p.date}`; if(!pairs[key]) pairs[key] = { collaboratorId:p.collaboratorId, date:p.date, arrivee:null, depart:null }; if(p.type==='arrivee') pairs[key].arrivee=p; else if(p.type==='depart') pairs[key].depart=p; });
+    const data = Object.values(pairs).sort((a,b)=>b.date.localeCompare(a.date)).map(r => {
+        const c = collaborators.find(co=>co.id===r.collaboratorId);
+        const h = computeHeuresNettes(r.collaboratorId, r.date);
+        const depMin = h?Math.round(h.depassement*60):0;
+        return { 'Collaborateur':c?.name||'?', 'Opération':c?.department||'—', 'Date':r.date, 'Arrivée':r.arrivee?.time||'—', 'Arrivée signée':r.arrivee?.signe?'Oui':'Non', 'Départ':r.depart?.time||'—', 'Départ signé':r.depart?.signe?'Oui':'Non', 'Temps brut':h?formatHeures(h.brutes):'—', 'Dépassement pause (min)':depMin, 'Temps net':h?formatHeures(h.nettes):'—' };
+    });
+    if(data.length===0) return alert('Aucune donnée');
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Pointages');
+    XLSX.writeFile(wb, `pointages_${getTodayStr()}.xlsx`);
+}
+async function recordSignature(collaboratorId, date, type) {
+    const existing = pointages.find(p => p.collaboratorId === collaboratorId && p.date === date && p.type === type);
+    const now = getNowStr();
+    if(existing) { existing.time = now; existing.signe = true; }
+    else { const newId = (await getNextId('pointage')).toString(); pointages.push({ id:newId, collaboratorId, date, type, time:now, signe:true }); }
+    saveAllData();
+}
+async function signFromAdmin(collabId, date, type) {
+    const collab = collaborators.find(c=>c.id===collabId);
+    if(!collab) return;
+    showPinPad(async pin => {
+        if(collab.pin !== pin) { alert('PIN incorrect'); return false; }
+        if(settings.securityMode === 'totp') {
+            if(!collab.totpActive) { alert('Le collaborateur n\'a pas encore activé son TOTP.'); return false; }
+            return showTotpVerification(async token => {
+                if(verifyTotp(collab.totpSecret, token)) {
+                    await recordSignature(collabId, date, type);
+                    renderPointagesList();
+                    return true;
+                } else { alert('Code TOTP invalide'); return false; }
+            });
+        } else {
+            await recordSignature(collabId, date, type);
+            renderPointagesList();
+            return true;
+        }
+    });
+}
+function showAddPointageModal() {
+    const today = getTodayStr();
+    const now = getNowStr();
+    const html = `<select id="ptCollab" class="form-select">${collaborators.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
+    <input id="ptDate" type="date" class="form-control mt-2" value="${today}">
+    <select id="ptType" class="form-select mt-2"><option value="arrivee">Arrivée</option><option value="depart">Départ</option></select>
+    <input id="ptTime" type="time" class="form-control mt-2" value="${now}">
+    <button class="btn btn-primary mt-2" onclick="addPointageFromModal()">Enregistrer</button>`;
+    showModal('Nouveau pointage', html);
+}
+async function addPointageFromModal() {
+    const collabId = parseInt(document.getElementById('ptCollab')?.value);
+    const date = document.getElementById('ptDate')?.value;
+    const type = document.getElementById('ptType')?.value;
+    const time = document.getElementById('ptTime')?.value;
+    if(!date||!time) return;
+    const newId = (await getNextId('pointage')).toString();
+    pointages.push({ id:newId, collaboratorId:collabId, date, type, time, signe:false });
+    saveAllData();
+    closeModal();
+    renderPointagesList();
+}
+async function editPointage(id) {
+    const p = pointages.find(p=>p.id===id);
+    if(!p) return;
+    const html = `<input id="editDate" type="date" class="form-control" value="${p.date}"><select id="editType" class="form-select mt-2"><option value="arrivee" ${p.type==='arrivee'?'selected':''}>Arrivée</option><option value="depart" ${p.type==='depart'?'selected':''}>Départ</option></select><input id="editTime" type="time" class="form-control mt-2" value="${p.time}"><button class="btn btn-primary mt-2" onclick="updatePointage('${id}')">Modifier</button>`;
+    showModal('Modifier pointage', html);
+}
+async function updatePointage(id) {
+    const p = pointages.find(p=>p.id===id);
+    if(p) { p.date = document.getElementById('editDate').value; p.type = document.getElementById('editType').value; p.time = document.getElementById('editTime').value; saveAllData(); closeModal(); renderPointagesList(); }
+}
+async function deletePointage(id) {
+    if(confirm('Supprimer ?')) { pointages = pointages.filter(p=>p.id!==id); saveAllData(); renderPointagesList(); }
+}
+
+// ==================== ABSENCES ====================
+function renderAbsences() {
+    let html = `<div class="d-flex justify-content-between"><h5>Absences</h5><button class="btn btn-primary btn-sm" onclick="showAddAbsenceModal()">Déclarer</button></div><table class="table"><thead><tr><th>Collaborateur</th><th>Début</th><th>Fin</th><th>Type</th><th>Motif</th><th></th></tr></thead><tbody>`;
+    absences.forEach(a => {
+        const c = collaborators.find(c=>c.id===a.collaboratorId);
+        html += `<tr><td>${c?.name||'?'}</td><td>${a.startDate}</td><td>${a.endDate}</td><td>${a.type}</td><td>${a.reason||''}</td><td><button class="btn btn-sm btn-danger" onclick="deleteAbsence('${a.id}')">Supprimer</button></td></tr>`;
+    });
+    html += `</tbody></table>`;
+    document.getElementById('tabAbsences').innerHTML = html;
+}
+function showAddAbsenceModal() {
+    const options = collaborators.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    const html = `<select id="absCollab" class="form-select">${options}</select>
+    <input id="absStart" type="date" class="form-control mt-2" value="${getTodayStr()}">
+    <input id="absEnd" type="date" class="form-control mt-2" value="${getTodayStr()}">
+    <select id="absType" class="form-select mt-2"><option>Congé payé</option><option>Maladie</option><option>Autre</option></select>
+    <input id="absReason" class="form-control mt-2" placeholder="Motif">
+    <button class="btn btn-primary mt-2" onclick="addAbsenceFromModal()">Enregistrer</button>`;
+    showModal('Nouvelle absence', html);
+}
+async function addAbsenceFromModal() {
+    const newId = (await getNextId('absence')).toString();
+    absences.push({
+        id: newId,
+        collaboratorId: parseInt(document.getElementById('absCollab').value),
+        startDate: document.getElementById('absStart').value,
+        endDate: document.getElementById('absEnd').value,
+        type: document.getElementById('absType').value,
+        reason: document.getElementById('absReason').value
+    });
+    saveAllData();
+    closeModal();
+    renderAbsences();
+    renderDashboard();
+}
+async function deleteAbsence(id) {
+    if(confirm('Supprimer ?')) { absences = absences.filter(a=>a.id!==id); saveAllData(); renderAbsences(); renderDashboard(); }
+}
+
+// ==================== COMMENTAIRES ====================
+function renderCommentaires() {
+    const today = getTodayStr();
+    let html = `<h5>Commentaires du jour</h5>`;
+    collaborators.forEach(c => {
+        const com = comments.find(co => co.collaboratorId === c.id && co.date === today);
+        html += `<div class="card p-2 mb-2"><strong>${c.name}</strong><div class="input-group"><input type="text" class="form-control form-control-sm" id="com_${c.id}" value="${com ? com.text : ''}"><button class="btn btn-sm btn-outline-primary" onclick="saveComment(${c.id})">Enregistrer</button><button class="btn btn-sm btn-outline-danger" onclick="deleteComment(${c.id})">Effacer</button></div></div>`;
+    });
+    document.getElementById('tabCommentaires').innerHTML = html;
+}
+async function saveComment(collabId) {
+    const text = document.getElementById(`com_${collabId}`).value.trim();
+    const today = getTodayStr();
+    const existing = comments.find(c => c.collaboratorId === collabId && c.date === today);
+    if(existing) { if(text==='') comments = comments.filter(c=>c.id!==existing.id); else existing.text = text; }
+    else if(text) { const newId = (await getNextId('comment')).toString(); comments.push({ id:newId, collaboratorId:collabId, date:today, text }); }
+    saveAllData();
+    renderCommentaires();
+}
+async function deleteComment(collabId) {
+    const today = getTodayStr();
+    const existing = comments.find(c => c.collaboratorId === collabId && c.date === today);
+    if(existing) { comments = comments.filter(c=>c.id!==existing.id); saveAllData(); renderCommentaires(); }
+}
+
+// ==================== PAUSES (séparation par opération, rotation indépendante) ====================
+let pauseInterval = null; let _pauseUnsub = null;
+function startPausesRealtime() {
+    if (_pauseUnsub) _pauseUnsub();
+    if (window.db && window.fsOnSnapshot) {
+        _pauseUnsub = window.fsOnSnapshot(window.fsCollection(window.db, 'pauses'), snap => {
+            pauses = snap.docs.map(d => d.data());
+            if (document.getElementById('pausesContainer')) renderPausesGrouped();
+        });
+    } else {
+        if(pauseInterval) clearInterval(pauseInterval);
+        pauseInterval = setInterval(async () => {
+            pauses = await fbLoadCollection('pauses');
+            if (document.getElementById('pausesContainer')) renderPausesGrouped();
+        }, 5000);
+    }
+}
+function stopPausesRealtime() { if (_pauseUnsub) { _pauseUnsub(); _pauseUnsub = null; } if(pauseInterval) clearInterval(pauseInterval); }
+function renderPausesTab() {
+    document.getElementById('tabPauses').innerHTML = `<div class="d-flex align-items-center mb-3 gap-2 flex-wrap"><h5><span class="live-dot"></span>Suivi des pauses par opération</h5><select id="pauseFilterStatut" class="form-select-sm" onchange="renderPausesGrouped()"><option value="all">Tous</option><option value="en_pause">En pause</option><option value="disponible">Disponible</option><option value="depasse">Dépassement en cours</option></select><input type="date" id="pauseExportDate" class="form-control-sm" value="${getTodayStr()}"><button class="btn btn-success btn-sm" onclick="exportPausesExcel()">Export pauses</button></div><div id="pausesContainer"></div>`;
+    renderPausesGrouped();
+}
+function renderPausesGrouped() {
+    const today = getTodayStr();
+    const filterStatut = document.getElementById('pauseFilterStatut')?.value || 'all';
+    // Récupérer les collaborateurs présents aujourd'hui
+    const allPresents = collaborators.filter(c => pointages.some(p => p.collaboratorId===c.id && p.date===today && p.type==='arrivee' && p.signe));
+    let filtered = [...allPresents];
+    if(filterStatut !== 'all') {
+        filtered = filtered.filter(c => {
+            const cp = pauses.filter(p=>p.collaboratorId===c.id);
+            const enCours = cp.find(p=>p.debut&&!p.fin);
+            if(filterStatut==='en_pause') return !!enCours;
+            if(filterStatut==='depasse') return enCours && minutesSince(enCours.debut) > PAUSE_CONFIG[enCours.type].duree;
+            if(filterStatut==='disponible') return !enCours;
+            return true;
+        });
+    }
+    // Grouper par opération (department)
+    const groups = {};
+    for (const c of filtered) {
+        const op = c.department || "Sans opération";
+        if (!groups[op]) groups[op] = [];
+        groups[op].push(c);
+    }
+    // Pour chaque groupe, appliquer sa propre rotation (stockée dans pauseRotationPerOp)
+    // mais l'affichage se fait simplement dans l'ordre du tableau (on peut trier selon l'ordre rotatif si désiré)
+    // Ici on affiche dans l'ordre alphabétique par nom, mais vous pouvez appliquer un tri personnalisé.
+    const container = document.getElementById('pausesContainer');
+    if (!container) return;
+    if (Object.keys(groups).length === 0) {
+        container.innerHTML = '<div class="alert alert-info">Aucun collaborateur présent pour le filtre sélectionné.</div>';
+        return;
+    }
+    let html = '';
+    for (const [opName, collabs] of Object.entries(groups)) {
+        // Trier les collaborateurs selon l'ordre rotatif de cette opération (stocké)
+        const rotation = pauseRotationPerOp[opName] || [];
+        let ordered = [...collabs];
+        if (rotation.length) {
+            ordered.sort((a,b) => {
+                const idxA = rotation.indexOf(a.id);
+                const idxB = rotation.indexOf(b.id);
+                if (idxA === -1 && idxB === -1) return a.name.localeCompare(b.name);
+                if (idxA === -1) return 1;
+                if (idxB === -1) return -1;
+                return idxA - idxB;
+            });
+        } else {
+            ordered.sort((a,b) => a.name.localeCompare(b.name));
+        }
+        html += `<div class="ops-block"><div class="ops-title"><i class="fas fa-layer-group"></i> ${opName}</div>
+        <div class="table-responsive"><table class="table table-bordered"><thead class="table-dark"><tr><th>Ordre</th><th>Collaborateur</th><th>☕ Matin</th><th>🍽️ Déjeuner</th><th>🧃 Après-midi</th><th>Statut actuel</th><th>Heures nettes</th><th>Dépassements</th></tr></thead><tbody>`;
+        ordered.forEach((c, idx) => {
+            const collabPauses = pauses.filter(p=>p.collaboratorId===c.id);
+            const pauseEnCours = collabPauses.find(p=>p.debut&&!p.fin);
+            let statutHtml = '<span class="text-muted">—</span>';
+            if(pauseEnCours) {
+                const cfg = PAUSE_CONFIG[pauseEnCours.type];
+                const elapsed = minutesSince(pauseEnCours.debut);
+                const reste = cfg.duree - elapsed;
+                if(reste>0) statutHtml = `<span class="pause-badge pause-en-cours">${cfg.icon} En pause (${Math.floor(elapsed)}min) — <span class="timer-live">${Math.ceil(reste)}min rest.</span></span>`;
+                else statutHtml = `<span class="pause-badge pause-depasse">⚠️ Dépassée de ${Math.ceil(-reste)}min</span>`;
+            }
+            const cols = ['matin','dejeuner','aprem'].map(type => {
+                const p = collabPauses.find(p=>p.type===type);
+                if(!p) return '<td><span class="pause-badge pause-dispo">—</span></td>';
+                if(p.debut&&!p.fin) return `<td><span class="pause-badge pause-en-cours">${p.debut} → en cours</span></td>`;
+                return `<td><span class="pause-badge ${p.depassement?'pause-depasse':'pause-termine'}">${p.debut}→${p.fin}</span></td>`;
+            }).join('');
+            const h = computeHeuresNettes(c.id, today);
+            const heuresHtml = h?`<strong>${formatHeures(h.nettes)}</strong>${h.depassement>0?`<br><small class="text-danger">-${Math.round(h.depassement*60)}min</small>`:''}`:'—';
+            const nbDep = collabPauses.filter(p=>p.depassement).length;
+            const depHtml = nbDep?`<span class="badge bg-danger">${nbDep} dép.</span>`:'—';
+            html += `<tr><td class="text-muted">${idx+1}</td><td><strong>${c.name}</strong><br><small>${c.company||''}</small></td>${cols}<td>${statutHtml}</td><td>${heuresHtml}</td><td>${depHtml}</td></tr>`;
+        });
+        html += `</tbody></table></div></div>`;
+    }
+    container.innerHTML = html;
+}
+function minutesSince(timeStr) {
+    const now = new Date();
+    const [h,m] = timeStr.split(':').map(Number);
+    const start = new Date(); start.setHours(h,m,0,0);
+    return (now-start)/60000;
+}
+function exportPausesExcel() {
+    const filterDate = document.getElementById('pauseExportDate')?.value || getTodayStr();
+    const pausesDuJour = pauses.filter(p=>p.date===filterDate);
+    if(pausesDuJour.length===0) return alert('Aucune pause');
+    const data = [];
+    collaborators.forEach(c => {
+        const cp = pausesDuJour.filter(p=>p.collaboratorId===c.id);
+        if(cp.length===0) return;
+        ['matin','dejeuner','aprem'].forEach(type => {
+            const p = cp.find(p=>p.type===type);
+            const cfg = PAUSE_CONFIG[type];
+            if(!p) return;
+            let dureeReelle='—', depMin=0;
+            if(p.debut && p.fin) {
+                const [h1,m1] = p.debut.split(':').map(Number);
+                const [h2,m2] = p.fin.split(':').map(Number);
+                const mins = Math.round(((h2+m2/60)-(h1+m1/60))*60);
+                dureeReelle = `${mins} min`;
+                depMin = Math.max(0, mins - cfg.duree);
+            }
+            data.push({ 'Collaborateur':c.name, 'Opération':c.department||'—', 'Date':filterDate, 'Type':cfg.label, 'Durée autorisée':cfg.duree+' min', 'Début':p.debut||'—', 'Fin':p.fin||'En cours', 'Durée réelle':dureeReelle, 'Dépassement (min)':depMin });
+        });
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Pauses');
+    XLSX.writeFile(wb, `pauses_${filterDate}.xlsx`);
+}
+
+// ==================== RAPPORTS ====================
+function renderRapports() {
+    const today = getTodayStr();
+    const deptMap = {};
+    collaborators.forEach(c => {
+        if(!deptMap[c.department]) deptMap[c.department] = { total:0, presents:0 };
+        deptMap[c.department].total++;
+        const hasArrival = pointages.some(p=>p.collaboratorId===c.id&&p.date===today&&p.type==='arrivee');
+        const absent = absences.some(a=>a.collaboratorId===c.id&&a.startDate<=today&&a.endDate>=today);
+        if(hasArrival && !absent) deptMap[c.department].presents++;
+    });
+    const deptLabels = Object.keys(deptMap);
+    const deptRates = deptLabels.map(d => deptMap[d].total ? Math.round(deptMap[d].presents/deptMap[d].total*100) : 0);
+    const since = new Date(); since.setDate(since.getDate()-30);
+    const recentAbs = absences.filter(a=>new Date(a.startDate)>=since);
+    const typeCount = {};
+    recentAbs.forEach(a=>typeCount[a.type]=(typeCount[a.type]||0)+1);
+    const weekStart = new Date(); weekStart.setDate(weekStart.getDate()-weekStart.getDay()+1);
+    const hoursMap = {}, hoursGrossMap = {};
+    pointages.forEach(p => {
+        if(new Date(p.date)>=weekStart && p.type==='arrivee' && p.signe) {
+            const h = computeHeuresNettes(p.collaboratorId, p.date);
+            if(h) { hoursMap[p.collaboratorId]=(hoursMap[p.collaboratorId]||0)+h.nettes; hoursGrossMap[p.collaboratorId]=(hoursGrossMap[p.collaboratorId]||0)+h.brutes; }
+        }
+    });
+    const hourLabels = collaborators.filter(c=>hoursMap[c.id]).map(c=>c.name);
+    const hourDataNet = collaborators.filter(c=>hoursMap[c.id]).map(c=>+hoursMap[c.id].toFixed(2));
+    const hourDataGross = collaborators.filter(c=>hoursMap[c.id]).map(c=>+hoursGrossMap[c.id].toFixed(2));
+    document.getElementById('tabRapports').innerHTML = `<div class="d-flex justify-content-between mb-3"><h5>Rapports</h5><button class="btn btn-success btn-sm" onclick="exportRapportCompletExcel()">Export rapport complet</button></div>
+    <div class="row"><div class="col-md-6"><canvas id="chartPresence"></canvas></div><div class="col-md-6"><canvas id="chartAbsences"></canvas></div></div>
+    <div class="mt-3"><canvas id="chartHours"></canvas></div>`;
+    new Chart(document.getElementById('chartPresence'), { type:'bar', data:{ labels:deptLabels, datasets:[{ label:'Taux présence (%)', data:deptRates, backgroundColor:'#0d6efd' }] } });
+    new Chart(document.getElementById('chartAbsences'), { type:'pie', data:{ labels:Object.keys(typeCount), datasets:[{ data:Object.values(typeCount) }] } });
+    new Chart(document.getElementById('chartHours'), { type:'bar', data:{ labels:hourLabels, datasets:[{ label:'Heures brutes (semaine)', data:hourDataGross, backgroundColor:'rgba(13,110,253,0.3)', borderColor:'#0d6efd' },{ label:'Heures nettes', data:hourDataNet, backgroundColor:'rgba(25,135,84,0.7)', borderColor:'#198754' }] } });
+}
+function exportRapportCompletExcel() {
+    const dates = [...new Set(pointages.map(p=>p.date))].sort();
+    const data = [];
+    collaborators.forEach(c => {
+        dates.forEach(date => {
+            const arr = pointages.find(p=>p.collaboratorId===c.id&&p.date===date&&p.type==='arrivee');
+            const dep = pointages.find(p=>p.collaboratorId===c.id&&p.date===date&&p.type==='depart');
+            if(!arr && !dep) return;
+            const h = computeHeuresNettes(c.id, date);
+            const collabPauses = pauses.filter(p=>p.collaboratorId===c.id&&p.date===date);
+            const depTotalMin = h?Math.round(h.depassement*60):0;
+            const pauseMatin = collabPauses.find(p=>p.type==='matin');
+            const pauseDej = collabPauses.find(p=>p.type==='dejeuner');
+            const pauseAprem = collabPauses.find(p=>p.type==='aprem');
+            data.push({ 'Collaborateur':c.name, 'Opération':c.department||'—', 'Date':date, 'Arrivée':arr?.time||'—', 'Départ':dep?.time||'—', 'Heures brutes':h?formatHeures(h.brutes):'—', 'Dépassements (min)':depTotalMin, 'Heures nettes':h?formatHeures(h.nettes):'—', 'Pause matin':pauseMatin?`${pauseMatin.debut}→${pauseMatin.fin||'...'}`:'—', 'Pause déjeuner':pauseDej?`${pauseDej.debut}→${pauseDej.fin||'...'}`:'—', 'Pause après-midi':pauseAprem?`${pauseAprem.debut}→${pauseAprem.fin||'...'}`:'—' });
+        });
+    });
+    if(data.length===0) return alert('Aucune donnée');
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Rapport complet');
+    XLSX.writeFile(wb, `rapport_complet_${getTodayStr()}.xlsx`);
+}
+
+// ==================== PARAMÈTRES ====================
+async function renderParametres() {
+    let html = `<h5>Paramètres</h5>
+    <div class="card p-3 mb-3"><h6>Thème</h6><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="themeSwitch" ${settings.theme==='dark'?'checked':''} onchange="toggleTheme()"><label>Mode sombre</label></div></div>
+    <div class="card p-3 mb-3"><h6>Mot de passe admin</h6><div class="input-group"><input type="password" id="oldPassword" placeholder="Ancien" class="form-control"><input type="password" id="newPassword" placeholder="Nouveau" class="form-control"><button class="btn btn-primary" onclick="changeAdminPassword()">Modifier</button></div></div>
+    <div class="card p-3 mb-3"><h6>Email admin (récupération)</h6><div class="input-group"><input type="email" id="adminEmailInput" class="form-control" placeholder="votre@email.com" value="${settings.admin.email||''}"><button class="btn btn-outline-primary" onclick="saveAdminEmail()">Enregistrer</button></div></div>
+    <div class="card p-3 mb-3"><h6>Mode sécurité</h6><select id="securityModeSelect" class="form-select" onchange="changeSecurityMode()"><option value="none" ${settings.securityMode==='none'?'selected':''}>Aucun</option><option value="totp" ${settings.securityMode==='totp'?'selected':''}>TOTP (Google Auth)</option></select></div>
+    <div class="card p-3"><h6>Codes PIN</h6><table class="table"><thead><tr><th>Collaborateur</th><th>Nouveau PIN</th><th></th></tr></thead><tbody>${collaborators.map(c=>`<tr><td>${c.name}</td><td><input type="password" class="form-control form-control-sm" id="pin_${c.id}" maxlength="4" placeholder="4 chiffres"></td><td><button class="btn btn-sm btn-warning" onclick="changeCollabPinFromParams(${c.id})">Modifier</button></td></tr>`).join('')}</tbody></table></div>`;
+    document.getElementById('tabParametres').innerHTML = html;
+}
+async function toggleTheme() { const isDark = document.getElementById('themeSwitch').checked; document.body.classList.toggle('dark', isDark); settings.theme = isDark ? 'dark' : 'light'; saveAllData(); }
+async function changeAdminPassword() { const old = document.getElementById('oldPassword').value; const newPwd = document.getElementById('newPassword').value; if(settings.admin.password !== old) return alert('Ancien mot de passe incorrect'); if(!newPwd || newPwd.length<4) return alert('4 caractères minimum'); settings.admin.password = newPwd; saveAllData(); alert('Mot de passe modifié'); document.getElementById('oldPassword').value = ''; document.getElementById('newPassword').value = ''; }
+async function saveAdminEmail() { const email = document.getElementById('adminEmailInput').value.trim(); if(!email || !email.includes('@')) return alert('Email invalide'); settings.admin.email = email; saveAllData(); alert('Email enregistré'); }
+async function changeSecurityMode() { const mode = document.getElementById('securityModeSelect').value; settings.securityMode = mode; saveAllData(); alert('Mode sécurité mis à jour'); }
+async function changeCollabPinFromParams(id) { const newPin = document.getElementById(`pin_${id}`).value.trim(); if(!/^\d{4}$/.test(newPin)) return alert('PIN invalide'); const c = collaborators.find(c=>c.id===id); if(c) c.pin = newPin; saveAllData(); alert('PIN modifié'); renderParametres(); }
+function showResetPasswordModal() { const email = settings.admin.email; showModal('Réinitialisation mot de passe', `<div>${email?`Email configuré : ${email.replace(/(.{2}).+(@.+)/,'$1***$2')}<br><button class="btn btn-primary" onclick="generateAndSendResetCode('${email}')">Envoyer code</button>`:`Aucun email configuré. Allez dans Paramètres.`}</div>`); }
+function generateAndSendResetCode(email) { const code = Math.floor(100000+Math.random()*900000); alert(`Code de réinitialisation : ${code}\n(Envoyez-le par email à ${email})`); const newPwd = prompt("Nouveau mot de passe"); if(newPwd && newPwd.length>=4) { settings.admin.password = newPwd; saveAllData(); alert('Mot de passe mis à jour'); closeModal(); } else alert('Annulé ou mot de passe trop court'); }
+async function refreshAllTabs() { await renderAllAdminTabs(); }
+
+// ==================== ATTESTATION PDF ====================
+async function genererAttestationPDF(collabId) {
+    const c = collaborators.find(c => c.id === collabId);
+    if (!c) return;
+    const today = new Date().toLocaleDateString('fr-FR');
+    const company = c.company || "SOFTCALL";
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFont("helvetica");
+    doc.setFontSize(16);
+    doc.text("ATTESTATION DE TRAVAIL", 105, 20, { align: "center" });
+    doc.setFontSize(12);
+    doc.text(`Je soussigné(e) ${company}, représentée par ...`, 20, 40);
+    doc.text(`atteste que M./Mme ${c.prenom || ''} ${c.name},`, 20, 50);
+    doc.text(`occupant le poste de ${c.poste || 'collaborateur'},`, 20, 60);
+    doc.text(`est membre de notre entreprise depuis le ${c.dateEntree || 'non renseignée'}.`, 20, 70);
+    doc.text(`Fait à Tunis, le ${today}`, 20, 90);
+    doc.text("Signature et cachet", 150, 110);
+    doc.save(`Attestation_${c.name}_${getTodayStr()}.pdf`);
+}
+
+// ==================== DASHBOARD COLLABORATEUR ====================
+async function renderCollabDashboard() {
+    const collab = collaborators.find(c=>c.id===currentUser.id);
+    if(!collab) { document.getElementById('collabDashboard').innerHTML = '<div class="alert alert-danger">Erreur</div>'; return; }
+    const today = getTodayStr();
+    const arrival = pointages.find(p=>p.collaboratorId===currentUser.id && p.date===today && p.type==='arrivee');
+    const departure = pointages.find(p=>p.collaboratorId===currentUser.id && p.date===today && p.type==='depart');
+    const heures = computeHeuresNettes(currentUser.id, today);
+    const comment = comments.find(c=>c.collaboratorId===currentUser.id && c.date===today);
+    const pauseEnCours = pauses.find(p=>p.collaboratorId===currentUser.id && p.date===today && p.debut && !p.fin);
+    const planning = plannings.find(p => p.collaboratorId === currentUser.id);
+    let planningHtml = '';
+    if (planning) {
+        planningHtml = `<div class="card planning-card p-3 mt-3 mb-3"><h6><i class="fas fa-calendar-alt"></i> Votre planning du jour</h6>
+        <div class="row"><div class="col-6"><strong>Arrivée prévue :</strong> ${planning.startTime}</div><div class="col-6"><strong>Départ prévu :</strong> ${planning.endTime}</div></div>
+        <div class="mt-2"><strong>Pauses recommandées :</strong><ul class="list-unstyled">${planning.breaks.map(b => `<li><span class="recommended-badge">${PAUSE_CONFIG[b.type]?.icon || '⌛'} ${PAUSE_CONFIG[b.type]?.label || b.type}</span> à ${b.start} (durée ${b.duration} min)</li>`).join('')}</ul></div></div>`;
+    }
+    let heuresHtml = '—';
+    if(heures) { const depMin = Math.round(heures.depassement*60); heuresHtml = `<strong>${formatHeures(heures.nettes)}</strong> <small>(brut ${formatHeures(heures.brutes)}${depMin>0?` − ${depMin}min dép.`:''})</small>`; }
+    const pauseStatuts = Object.entries(PAUSE_CONFIG).map(([type,cfg]) => {
+        const p = pauses.find(p=>p.collaboratorId===currentUser.id && p.date===today && p.type===type);
+        if(!p) return { type, cfg, statut:'dispo' };
+        if(p.debut && !p.fin) return { type, cfg, statut:'en_cours', pause:p };
+        if(p.depassement) return { type, cfg, statut:'depasse', pause:p };
+        return { type, cfg, statut:'termine', pause:p };
+    });
+    let pauseHtml = '<div class="mt-3"><h6>Pauses du jour</h6><div class="d-flex flex-wrap gap-2">';
+    pauseStatuts.forEach(({type,cfg,statut,pause}) => {
+        let badge='', btn='';
+        if(statut==='dispo') {
+            badge = '<span class="pause-badge pause-dispo">Disponible</span>';
+            const disabled = (pauseEnCours || !arrival?.signe || departure?.signe) ? 'disabled' : '';
+            btn = `<button class="btn btn-sm btn-outline-secondary ms-1" ${disabled} onclick="demarrerPause('${type}')">Démarrer</button>`;
+        } else if(statut==='en_cours') {
+            const elapsed = minutesSince(pause.debut);
+            const over = elapsed > cfg.duree;
+            badge = `<span class="pause-badge ${over?'pause-depasse':'pause-en-cours'}">En cours – <span id="collabTimer_${type}" class="timer-live">...</span></span>`;
+            btn = `<button class="btn btn-sm btn-warning ms-1" onclick="terminerPause()">Terminer</button>`;
+            startCollabPauseTimer(type, cfg.duree, pause.debut);
+        } else if(statut==='termine') { badge = `<span class="pause-badge pause-termine">Terminée ${pause.debut}→${pause.fin}</span>`; }
+        else if(statut==='depasse') { badge = `<span class="pause-badge pause-depasse">⚠ Dépassée ${pause.debut}→${pause.fin}</span>`; }
+        pauseHtml += `<div class="d-flex align-items-center border rounded p-2"><span style="font-size:1.2rem;">${cfg.icon}</span><div class="flex-grow-1 ms-2"><strong>${cfg.label}</strong> <small>(${cfg.duree} min)</small><br>${badge}</div>${btn}</div>`;
+    });
+    pauseHtml += '</div></div>';
+    let totpWarning = '';
+    if (settings.securityMode === 'totp' && !collab.totpActive) {
+        totpWarning = `<div class="alert alert-warning mb-3"><i class="fas fa-shield-alt"></i> Votre compte nécessite une double authentification. Veuillez contacter l'administrateur pour l'activer.</div>`;
+    }
+    document.getElementById('collabDashboard').innerHTML = `<h4>Bonjour ${collab.name}</h4>${totpWarning}
+    <div class="mb-2"><strong>Société :</strong> ${collab.company || '—'}</div>
+    ${comment?`<div class="alert alert-warning">📝 ${comment.text}</div>`:''}
+    <table class="table"><tr><th>Statut</th><td>${arrival?'Présent':'Absent'}</td></tr>
+    <tr><th>Arrivée</th><td>${arrival?`${arrival.time} ${arrival.signe?'✓':'⌛'}`:'—'}</td></tr>
+    <tr><th>Départ</th><td>${departure?`${departure.time} ${departure.signe?'✓':'⌛'}`:'—'}</td></tr>
+    <tr><th>Heures réelles</th><td>${heuresHtml}</td></tr></table>
+    <div class="d-grid gap-2"><button class="btn btn-success btn-lg" onclick="signPointage('arrivee')" ${arrival?.signe || (settings.securityMode === 'totp' && !collab.totpActive) ? 'disabled' : ''}>Signer arrivée</button>
+    <button class="btn btn-danger btn-lg" onclick="signPointage('depart')" ${departure?.signe || (settings.securityMode === 'totp' && !collab.totpActive) ? 'disabled' : ''}>Signer départ</button>
+    <button class="btn btn-primary" onclick="genererAttestationPDF(${currentUser.id})"><i class="fas fa-file-pdf"></i> Attestation PDF</button></div>${planningHtml}${pauseHtml}`;
+}
+function startCollabPauseTimer(type, dureeMax, debut) { const el = document.getElementById(`collabTimer_${type}`); if(!el) return; const update = () => { const elapsed = minutesSince(debut); const reste = dureeMax - elapsed; if(!document.getElementById(`collabTimer_${type}`)) return; if(reste>0) el.textContent = `${Math.floor(elapsed)}min / ${Math.ceil(reste)}min rest.`; else el.textContent = `⚠ dépassée de ${Math.ceil(-reste)}min`; }; update(); setInterval(() => { if(document.getElementById(`collabTimer_${type}`)) update(); }, 10000); }
+async function demarrerPause(type) { const collab = collaborators.find(c=>c.id===currentUser.id); const today = getTodayStr(); if(pauses.find(p=>p.collaboratorId===currentUser.id && p.date===today && p.debut && !p.fin)) return alert('Pause déjà en cours'); if(pauses.find(p=>p.collaboratorId===currentUser.id && p.date===today && p.type===type)) return alert('Pause déjà utilisée'); const arrival = pointages.find(p=>p.collaboratorId===currentUser.id && p.date===today && p.type==='arrivee' && p.signe); if(!arrival) return alert('Signez votre arrivée d\'abord'); showPinPad(async pin => { if(collab.pin !== pin) { alert('PIN incorrect'); return false; } if(settings.securityMode === 'totp') { if(!collab.totpActive) { alert('Double authentification non activée. Contactez l\'admin.'); return false; } return showTotpVerification(async token => { if(verifyTotp(collab.totpSecret, token)) { const newId = `pause_${currentUser.id}_${today}_${type}`; pauses.push({ id:newId, collaboratorId:currentUser.id, date:today, type, debut:getNowStr(), fin:null, depassement:false }); saveAllData(); await renderCollabDashboard(); return true; } else { alert('Code TOTP invalide'); return false; } }); } else { const newId = `pause_${currentUser.id}_${today}_${type}`; pauses.push({ id:newId, collaboratorId:currentUser.id, date:today, type, debut:getNowStr(), fin:null, depassement:false }); saveAllData(); await renderCollabDashboard(); return true; } }); }
+async function terminerPause() { const collab = collaborators.find(c=>c.id===currentUser.id); const en_cours = pauses.find(p=>p.collaboratorId===currentUser.id && p.date===getTodayStr() && p.debut && !p.fin); if(!en_cours) return alert('Aucune pause en cours'); showPinPad(async pin => { if(collab.pin !== pin) { alert('PIN incorrect'); return false; } if(settings.securityMode === 'totp') { if(!collab.totpActive) { alert('Double authentification non activée'); return false; } return showTotpVerification(async token => { if(verifyTotp(collab.totpSecret, token)) { const fin = getNowStr(); const dureeReelle = minutesSince(en_cours.debut); const depassement = dureeReelle > PAUSE_CONFIG[en_cours.type].duree; en_cours.fin = fin; en_cours.depassement = depassement; saveAllData(); await renderCollabDashboard(); return true; } else { alert('Code TOTP invalide'); return false; } }); } else { const fin = getNowStr(); const dureeReelle = minutesSince(en_cours.debut); const depassement = dureeReelle > PAUSE_CONFIG[en_cours.type].duree; en_cours.fin = fin; en_cours.depassement = depassement; saveAllData(); await renderCollabDashboard(); return true; } }); }
+async function signPointage(type) { const collab = collaborators.find(c=>c.id===currentUser.id); showPinPad(async pin => { if(collab.pin !== pin) { alert('PIN incorrect'); return false; } if(settings.securityMode === 'totp') { if(!collab.totpActive) { alert('Double authentification non activée. Contactez l\'admin.'); return false; } return showTotpVerification(async token => { if(verifyTotp(collab.totpSecret, token)) { await recordSignature(currentUser.id, getTodayStr(), type); await renderCollabDashboard(); return true; } else { alert('Code TOTP invalide'); return false; } }); } else { await recordSignature(currentUser.id, getTodayStr(), type); await renderCollabDashboard(); return true; } }); }
+function formatHeures(h) { if(h===null||h===undefined) return '—'; const total = Math.abs(h); const hh = Math.floor(total); const mm = Math.round((total - hh)*60); return `${hh}h${mm.toString().padStart(2,'0')}`; }
+function computeHeuresNettes(collabId, date) { const arr = pointages.find(p => p.collaboratorId === collabId && p.date === date && p.type === 'arrivee'); const dep = pointages.find(p => p.collaboratorId === collabId && p.date === date && p.type === 'depart'); if(!arr || !dep) return null; const [h1,m1] = arr.time.split(':').map(Number); const [h2,m2] = dep.time.split(':').map(Number); const brutes = (h2 + m2/60) - (h1 + m1/60); if(brutes <= 0) return null; const depassement = getDepassementMinutes(collabId, date); const nettes = brutes - depassement; return { brutes, nettes, depassement }; }
+function getDepassementMinutes(collabId, date) { const collabPauses = pauses.filter(p => p.collaboratorId === collabId && p.date === date && p.debut && p.fin); let totalDep = 0; collabPauses.forEach(p => { const cfg = PAUSE_CONFIG[p.type]; if(!cfg) return; const [h1,m1] = p.debut.split(':').map(Number); const [h2,m2] = p.fin.split(':').map(Number); const dureeReelle = (h2 + m2/60) - (h1 + m1/60); const dureeMax = cfg.duree / 60; const dep = dureeReelle - dureeMax; if(dep > 0) totalDep += dep; }); return totalDep; }
+
+// ==================== ROTATION DES PAUSES PAR OPÉRATION ====================
+function getTodayKey() { return getTodayStr(); }
+function updatePauseRotation() {
+    const today = getTodayKey();
+    const stored = sessionStorage.getItem("allaccess_pauseRotationPerOp");
+    let saved = stored ? JSON.parse(stored) : null;
+    // Pour chaque opération existante, créer ou faire tourner l'ordre
+    const operations = [...new Set(collaborators.map(c => c.department).filter(d => d && d.trim() !== ""))];
+    for (const op of operations) {
+        const members = collaborators.filter(c => c.department === op).map(c => c.id);
+        if (members.length === 0) continue;
+        let order = [];
+        if (saved && saved[op] && saved[op].date === today) {
+            order = saved[op].order;
+        } else if (saved && saved[op] && saved[op].order) {
+            // rotation : décaler circulairement
+            let prev = saved[op].order;
+            if (prev.length >= 2) {
+                let lastTwo = prev.slice(-2);
+                let rest = prev.slice(0, -2);
+                order = [...lastTwo, ...rest];
+            } else {
+                order = [...prev];
+            }
+        } else {
+            order = [...members];
+        }
+        pauseRotationPerOp[op] = order;
+    }
+    // Sauvegarde dans sessionStorage
+    const toSave = {};
+    for (const op of operations) {
+        toSave[op] = { date: today, order: pauseRotationPerOp[op] || [] };
+    }
+    sessionStorage.setItem("allaccess_pauseRotationPerOp", JSON.stringify(toSave));
+}
+function ensurePauseRotation() { updatePauseRotation(); }
+
+// ==================== MODALES ET KEYPAD ====================
+function openRhModal(title, body, onSave) { document.getElementById('rhModalOverlay')?.remove(); const overlay = document.createElement('div'); overlay.id='rhModalOverlay'; overlay.className='modal-rh'; overlay.innerHTML = `<div class="modal-rh-box"><div class="d-flex justify-content-between mb-3"><h5>${title}</h5><button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('rhModalOverlay').remove()"><i class="fas fa-times"></i></button></div><div id="rhModalBody">${body}</div>${onSave?`<div class="d-flex justify-content-end gap-2 mt-3"><button class="btn btn-secondary" onclick="document.getElementById('rhModalOverlay').remove()">Annuler</button><button class="btn btn-primary" id="rhModalSaveBtn">Enregistrer</button></div>`:''}</div>`; document.body.appendChild(overlay); if(onSave) document.getElementById('rhModalSaveBtn').onclick = async () => { await onSave(); document.getElementById('rhModalOverlay')?.remove(); }; overlay.addEventListener('click', e => { if(e.target===overlay) overlay.remove(); }); }
+function buildKeypad(containerId, onDigit, onDelete) { const cont = document.getElementById(containerId); if(!cont) return; cont.innerHTML = ''; for(let i=1;i<=9;i++) { const btn = document.createElement('button'); btn.className='btn btn-outline-secondary keypad-btn'; btn.innerText=i; btn.onclick=()=>onDigit(i.toString()); cont.appendChild(btn); } const btn0 = document.createElement('button'); btn0.className='btn btn-outline-secondary keypad-btn'; btn0.innerText='0'; btn0.onclick=()=>onDigit('0'); cont.appendChild(btn0); const del = document.createElement('button'); del.className='btn btn-outline-danger keypad-btn'; del.innerHTML='<i class="fas fa-delete-left"></i>'; del.onclick=onDelete; cont.appendChild(del); }
+function showPinPad(callback) { let pin=''; const modal = document.createElement('div'); modal.className='modal d-block'; modal.innerHTML = `<div class="modal-dialog modal-sm"><div class="modal-content"><div class="modal-header">Code PIN</div><div class="modal-body text-center"><div class="h3 border p-2 mb-3" id="pinDisplay">****</div><div id="pinKeypad"></div><button class="btn btn-primary mt-2 w-100" id="pinOk">Valider</button></div></div></div>`; document.body.appendChild(modal); const display = modal.querySelector('#pinDisplay'); const update = () => display.innerText = pin.padEnd(4,'*'); buildKeypad('pinKeypad', d=>{ if(pin.length<4){ pin+=d; update(); } }, ()=>{ pin=pin.slice(0,-1); update(); }); modal.querySelector('#pinOk').onclick = () => { if(pin.length===4) { const ok = callback(pin); if(ok) modal.remove(); else { pin=''; update(); } } else alert('4 chiffres'); }; modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); }); }
+function showTotpVerification(callback) { let code=''; const modal = document.createElement('div'); modal.className='modal d-block'; modal.innerHTML = `<div class="modal-dialog modal-sm"><div class="modal-content"><div class="modal-header">Code TOTP</div><div class="modal-body text-center"><div class="h3 border p-2 mb-3" id="totpDisplay">------</div><div id="totpKeypad"></div><button class="btn btn-primary mt-2 w-100" id="totpOk">Valider</button></div></div></div>`; document.body.appendChild(modal); const display = modal.querySelector('#totpDisplay'); const update = () => display.innerText = code.padEnd(6, '-'); buildKeypad('totpKeypad', d=>{ if(code.length<6){ code+=d; update(); } }, ()=>{ code=code.slice(0,-1); update(); }); modal.querySelector('#totpOk').onclick = () => { if(code.length===6) { const ok = callback(code); if(ok) modal.remove(); else { code=''; update(); alert('Code incorrect'); } } else alert('6 chiffres requis'); }; modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); }); }
+function showModal(title, bodyHtml) { const modal = document.createElement('div'); modal.className='modal d-block'; modal.innerHTML = `<div class="modal-dialog"><div class="modal-content"><div class="modal-header">${title}<button type="button" class="btn-close" onclick="closeModal()"></button></div><div class="modal-body">${bodyHtml}</div></div></div>`; document.body.appendChild(modal); window._currentModal = modal; }
+function closeModal() { if(window._currentModal) window._currentModal.remove(); window._currentModal = null; }
+
+// ==================== INITIALISATION ====================
+async function appInit() {
+    await new Promise(resolve => { if (window.firebaseReady) return resolve(); window._onFirebaseReady = resolve; setTimeout(resolve, 5000); });
+    await loadAllData();
+    if(settings.theme === 'dark') document.body.classList.add('dark');
+    const select = document.getElementById('collabSelect');
+    if(select) select.innerHTML = '<option value="">-- Choisir --</option>' + collaborators.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    document.getElementById('loginScreen').classList.remove('d-none');
+    document.getElementById('searchCollab')?.addEventListener('input', () => renderCollaborateursList());
+    document.getElementById('searchContrat')?.addEventListener('input', () => renderContratsList());
+    document.getElementById('searchSalaire')?.addEventListener('input', () => renderSalairesList());
+    document.getElementById('searchPointage')?.addEventListener('input', () => renderPointagesList());
+    document.getElementById('filterStatus')?.addEventListener('change', () => renderPointagesList());
+}
+appInit();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
