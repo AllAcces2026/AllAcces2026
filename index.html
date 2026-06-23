@@ -664,6 +664,46 @@
     let currentUser = null;
     let collabPinInput = "";
 
+    // ===== GESTION TOTP QUOTIDIEN (localStorage) =====
+    function getTotpVerifiedKey(collabId) { return `totp_verified_${collabId}`; }
+    function isTotpVerifiedToday(collabId) {
+        const today = getTodayStr();
+        const stored = localStorage.getItem(getTotpVerifiedKey(collabId));
+        return stored === today;
+    }
+    function setTotpVerifiedToday(collabId) {
+        localStorage.setItem(getTotpVerifiedKey(collabId), getTodayStr());
+    }
+
+    // Fonction utilitaire pour exécuter une action avec vérification TOTP uniquement si nécessaire
+    async function executeWithTotpCheck(collab, action) {
+        // Si le mode TOTP n'est pas activé ou le collaborateur n'a pas activé le TOTP, on exécute directement
+        if (settings.securityMode !== 'totp' || !collab.totpActive) {
+            return await action();
+        }
+
+        // Vérifier si déjà vérifié aujourd'hui
+        if (isTotpVerifiedToday(collab.id)) {
+            return await action();
+        }
+
+        // Sinon, demander le code TOTP
+        return new Promise((resolve, reject) => {
+            showTotpVerification(async (token) => {
+                if (verifyTotp(collab.totpSecret, token)) {
+                    setTotpVerifiedToday(collab.id);
+                    const result = await action();
+                    resolve(result);
+                    return true;
+                } else {
+                    alert('Code TOTP invalide');
+                    reject('TOTP invalide');
+                    return false;
+                }
+            });
+        });
+    }
+
     function showAdminLogin() {
         document.getElementById('loginRole').classList.add('d-none');
         document.getElementById('adminLoginForm').classList.remove('d-none');
@@ -710,9 +750,18 @@
             return;
         }
 
+        // Vérification TOTP uniquement si mode activé et collaborateur a activé le TOTP
         if (settings.securityMode === 'totp' && collab.totpActive) {
+            // Si déjà vérifié aujourd'hui, on connecte sans redemander
+            if (isTotpVerifiedToday(collab.id)) {
+                currentUser = { type: 'collab', id: collab.id, name: collab.name };
+                await showInterface();
+                return;
+            }
+            // Sinon on demande le TOTP
             showTotpVerification(async (token) => {
                 if (verifyTotp(collab.totpSecret, token)) {
+                    setTotpVerifiedToday(collab.id);
                     currentUser = { type: 'collab', id: collab.id, name: collab.name };
                     await showInterface();
                     return true;
@@ -722,6 +771,7 @@
                 }
             });
         } else {
+            // Mode sans TOTP ou TOTP non activé par le collaborateur
             currentUser = { type: 'collab', id: collab.id, name: collab.name };
             await showInterface();
         }
@@ -933,7 +983,6 @@
         return { total, pris, restants: total - pris };
     }
 
-    // ===== FONCTION SAVE AND RELOAD ROBUSTE =====
     async function saveAndReload() {
         try {
             await saveAllData();
@@ -950,13 +999,11 @@
         }
     }
 
-    // ===== TOGGLE ACTIF =====
     async function toggleActif(id, checked) {
         const c = collaborators.find(c => c.id === id);
         if (c) { c.actif = checked; await saveAndReload(); }
     }
 
-    // ===== FORMULAIRES COLLABORATEURS =====
     function buildCollabForm(c) {
         const actif = c?.actif !== undefined ? c.actif : true;
         return `<div class="row g-3">
@@ -1006,7 +1053,6 @@
         };
     }
 
-    // ===== AJOUT / MODIFICATION / SUPPRESSION COLLABORATEUR =====
     async function showAddCollabModal() {
         openRhModal('Nouveau collaborateur', buildCollabForm(null), async () => {
             const data = readCollabForm();
@@ -1015,7 +1061,6 @@
             const totpSecret = generateTotpSecret();
             const newCollab = { id: newId, totpSecret, totpActive: false, ...data };
             collaborators.push(newCollab);
-            // Planning
             plannings.push({
                 id: `plan_${newId}`,
                 collaboratorId: newId,
@@ -1027,7 +1072,6 @@
                     { type: "aprem", start: "15:30", duration: 15 }
                 ]
             });
-            // Contrat par défaut
             contracts.push({
                 id: 'ct_' + Date.now(),
                 collaboratorId: newId,
@@ -1053,35 +1097,25 @@
         });
     }
 
-    // ===== SUPPRESSION ROBUSTE =====
     async function deleteCollab(id) {
         if (!confirm('Supprimer définitivement ce collaborateur et toutes ses données associées ?')) return;
         try {
             const deletePromises = [];
-            // Collaborateur
             deletePromises.push(fbDeleteDoc('collaborators', id));
-            // Pointages
             const pts = pointages.filter(p => p.collaboratorId === id);
             for (const p of pts) deletePromises.push(fbDeleteDoc('pointages', p.id));
-            // Absences
             const abs = absences.filter(a => a.collaboratorId === id);
             for (const a of abs) deletePromises.push(fbDeleteDoc('absences', a.id));
-            // Commentaires
             const coms = comments.filter(c => c.collaboratorId === id);
             for (const c of coms) deletePromises.push(fbDeleteDoc('comments', c.id));
-            // Pauses
             const paus = pauses.filter(p => p.collaboratorId === id);
             for (const p of paus) deletePromises.push(fbDeleteDoc('pauses', p.id));
-            // Contrats
             const ctrs = contracts.filter(ct => ct.collaboratorId === id);
             for (const ct of ctrs) deletePromises.push(fbDeleteDoc('contracts', ct.id));
-            // Congés
             const leaves = leaveRequests.filter(l => l.collaboratorId === id);
             for (const l of leaves) deletePromises.push(fbDeleteDoc('leaveRequests', l.id));
-            // Plannings
             const plans = plannings.filter(p => p.collaboratorId === id);
             for (const p of plans) deletePromises.push(fbDeleteDoc('plannings', p.id));
-            // Équipes (mise à jour)
             for (const team of teams) {
                 if (team.chefId === id) {
                     team.chefId = null;
@@ -1093,7 +1127,6 @@
                 }
             }
             await Promise.all(deletePromises);
-            // Mise à jour locale
             collaborators = collaborators.filter(c => c.id !== id);
             pointages = pointages.filter(p => p.collaboratorId !== id);
             absences = absences.filter(a => a.collaboratorId !== id);
@@ -1113,7 +1146,6 @@
         }
     }
 
-    // ===== FICHE COLLABORATEUR =====
     function showFicheCollab(id) {
         const c = collaborators.find(co => co.id === id);
         const contrat = contracts.find(ct => ct.collaboratorId === id && ct.actif);
@@ -1145,7 +1177,6 @@
         </div>`, null);
     }
 
-    // ===== TOTP =====
     function showTotpQr(collabId) {
         const c = collaborators.find(c => c.id === collabId);
         if (!c) return;
@@ -1483,23 +1514,39 @@
         await saveAndReload();
     }
 
+    // Fonction pour signer depuis le dashboard collaborateur (avec TOTP quotidien)
+    async function signPointage(type) {
+        const collab = collaborators.find(c => c.id === currentUser.id);
+        if (!collab) return;
+        showPinPad(async pin => {
+            if (collab.pin !== pin) {
+                alert('PIN incorrect');
+                return false;
+            }
+            await executeWithTotpCheck(collab, async () => {
+                await recordSignature(currentUser.id, getTodayStr(), type);
+                await renderCollabDashboard();
+                return true;
+            });
+            return true;
+        });
+    }
+
+    // Fonction pour signer depuis l'admin (avec TOTP quotidien)
     async function signFromAdmin(collabId, date, type) {
         const collab = collaborators.find(c => c.id === collabId);
         if (!collab) return;
         showPinPad(async pin => {
-            if (collab.pin !== pin) { alert('PIN incorrect'); return false; }
-            if (settings.securityMode === 'totp') {
-                if (!collab.totpActive) { alert('Le collaborateur n\'a pas encore activé son TOTP.'); return false; }
-                return showTotpVerification(async token => {
-                    if (verifyTotp(collab.totpSecret, token)) {
-                        await recordSignature(collabId, date, type);
-                        return true;
-                    } else { alert('Code TOTP invalide'); return false; }
-                });
-            } else {
-                await recordSignature(collabId, date, type);
-                return true;
+            if (collab.pin !== pin) {
+                alert('PIN incorrect');
+                return false;
             }
+            await executeWithTotpCheck(collab, async () => {
+                await recordSignature(collabId, date, type);
+                renderPointagesList();
+                return true;
+            });
+            return true;
         });
     }
 
@@ -1882,7 +1929,6 @@
         } else alert('Annulé ou mot de passe trop court');
     }
 
-    // ===== REFRESH =====
     async function refreshAllTabs() {
         await loadAllData();
         if (currentUser && currentUser.type === 'admin') {
@@ -1985,84 +2031,70 @@
         setInterval(() => { if (document.getElementById(`collabTimer_${type}`)) update(); }, 10000);
     }
 
+    // Pauses : démarrage avec TOTP quotidien
     async function demarrerPause(type) {
         const collab = collaborators.find(c => c.id === currentUser.id);
         const today = getTodayStr();
-        if (pauses.find(p => p.collaboratorId === currentUser.id && p.date === today && p.debut && !p.fin)) return alert('Pause déjà en cours');
-        if (pauses.find(p => p.collaboratorId === currentUser.id && p.date === today && p.type === type)) return alert('Pause déjà utilisée');
+
+        if (pauses.find(p => p.collaboratorId === currentUser.id && p.date === today && p.debut && !p.fin)) {
+            alert('Pause déjà en cours');
+            return;
+        }
+        if (pauses.find(p => p.collaboratorId === currentUser.id && p.date === today && p.type === type)) {
+            alert('Pause déjà utilisée');
+            return;
+        }
         const arrival = pointages.find(p => p.collaboratorId === currentUser.id && p.date === today && p.type === 'arrivee' && p.signe);
-        if (!arrival) return alert('Signez votre arrivée d\'abord');
+        if (!arrival) {
+            alert('Signez votre arrivée d\'abord');
+            return;
+        }
+
         showPinPad(async pin => {
-            if (collab.pin !== pin) { alert('PIN incorrect'); return false; }
-            if (settings.securityMode === 'totp') {
-                if (!collab.totpActive) { alert('Double authentification non activée. Contactez l\'admin.'); return false; }
-                return showTotpVerification(async token => {
-                    if (verifyTotp(collab.totpSecret, token)) {
-                        const newId = `pause_${currentUser.id}_${today}_${type}`;
-                        pauses.push({ id: newId, collaboratorId: currentUser.id, date: today, type, debut: getNowStr(), fin: null, depassement: false });
-                        await saveAndReload();
-                        return true;
-                    } else { alert('Code TOTP invalide'); return false; }
-                });
-            } else {
+            if (collab.pin !== pin) {
+                alert('PIN incorrect');
+                return false;
+            }
+            await executeWithTotpCheck(collab, async () => {
                 const newId = `pause_${currentUser.id}_${today}_${type}`;
                 pauses.push({ id: newId, collaboratorId: currentUser.id, date: today, type, debut: getNowStr(), fin: null, depassement: false });
                 await saveAndReload();
+                await renderCollabDashboard();
                 return true;
-            }
+            });
+            return true;
         });
     }
 
+    // Pauses : terminer avec TOTP quotidien
     async function terminerPause() {
         const collab = collaborators.find(c => c.id === currentUser.id);
         const en_cours = pauses.find(p => p.collaboratorId === currentUser.id && p.date === getTodayStr() && p.debut && !p.fin);
-        if (!en_cours) return alert('Aucune pause en cours');
+        if (!en_cours) {
+            alert('Aucune pause en cours');
+            return;
+        }
+
         showPinPad(async pin => {
-            if (collab.pin !== pin) { alert('PIN incorrect'); return false; }
-            if (settings.securityMode === 'totp') {
-                if (!collab.totpActive) { alert('Double authentification non activée'); return false; }
-                return showTotpVerification(async token => {
-                    if (verifyTotp(collab.totpSecret, token)) {
-                        const fin = getNowStr();
-                        const dureeReelle = minutesSince(en_cours.debut);
-                        const depassement = dureeReelle > PAUSE_CONFIG[en_cours.type].duree;
-                        en_cours.fin = fin;
-                        en_cours.depassement = depassement;
-                        await saveAndReload();
-                        return true;
-                    } else { alert('Code TOTP invalide'); return false; }
-                });
-            } else {
+            if (collab.pin !== pin) {
+                alert('PIN incorrect');
+                return false;
+            }
+            await executeWithTotpCheck(collab, async () => {
                 const fin = getNowStr();
                 const dureeReelle = minutesSince(en_cours.debut);
                 const depassement = dureeReelle > PAUSE_CONFIG[en_cours.type].duree;
                 en_cours.fin = fin;
                 en_cours.depassement = depassement;
                 await saveAndReload();
+                await renderCollabDashboard();
                 return true;
-            }
+            });
+            return true;
         });
     }
 
-    async function signPointage(type) {
-        const collab = collaborators.find(c => c.id === currentUser.id);
-        showPinPad(async pin => {
-            if (collab.pin !== pin) { alert('PIN incorrect'); return false; }
-            if (settings.securityMode === 'totp') {
-                if (!collab.totpActive) { alert('Double authentification non activée. Contactez l\'admin.'); return false; }
-                return showTotpVerification(async token => {
-                    if (verifyTotp(collab.totpSecret, token)) {
-                        await recordSignature(currentUser.id, getTodayStr(), type);
-                        return true;
-                    } else { alert('Code TOTP invalide'); return false; }
-                });
-            } else {
-                await recordSignature(currentUser.id, getTodayStr(), type);
-                return true;
-            }
-        });
-    }
-
+    // ===== FONCTIONS UTILITAIRES =====
     function formatHeures(h) {
         if (h === null || h === undefined) return '—';
         const total = Math.abs(h);
