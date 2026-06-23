@@ -13,7 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <style>
-        /* ===== ROOT & VARIABLES (inchangé) ===== */
+        /* ===== ROOT & VARIABLES ===== */
         :root {
             --bg: #f0f4fb;
             --card-bg: rgba(255, 255, 255, 0.85);
@@ -61,7 +61,7 @@
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-thumb { background: var(--primary-light); border-radius: 10px; }
 
-        /* ===== LOGIN (inchangé) ===== */
+        /* ===== LOGIN ===== */
         .login-wrapper {
             min-height: 100vh;
             background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #312e81 100%);
@@ -576,7 +576,7 @@
         }
         batch.set(window.fsDoc(window.db, 'config', 'settings'), settings);
         batch.set(window.fsDoc(window.db, 'config', 'counters'), counters);
-        try { await batch.commit(); } catch(e) { console.error(e); }
+        try { await batch.commit(); } catch(e) { console.error(e); throw e; }
     }
 
     async function loadAllData() {
@@ -738,7 +738,6 @@
         document.getElementById('collabLoginForm').classList.add('d-none');
         document.getElementById('adminPass').value = '';
         closeSidebar();
-        // Arrêter l'écoute des pauses
         stopPausesRealtime();
     }
     document.getElementById('btnLogout').addEventListener('click', logout);
@@ -779,7 +778,6 @@
 
     async function showInterface() {
         document.getElementById('loginScreen').classList.add('d-none');
-        // Charger les données avant d'afficher
         await loadAllData();
         if (currentUser.type === 'admin') {
             document.getElementById('adminPanel').classList.remove('d-none');
@@ -935,23 +933,30 @@
         return { total, pris, restants: total - pris };
     }
 
-    // Fonction générique pour sauvegarder et recharger
+    // ===== FONCTION SAVE AND RELOAD ROBUSTE =====
     async function saveAndReload() {
-        await saveAllData();
-        await loadAllData();
-        if (currentUser && currentUser.type === 'admin') {
-            await renderAllAdminTabs();
-            startPausesRealtime();
-        } else if (currentUser && currentUser.type === 'collab') {
-            await renderCollabDashboard();
+        try {
+            await saveAllData();
+            await loadAllData();
+            if (currentUser && currentUser.type === 'admin') {
+                await renderAllAdminTabs();
+                startPausesRealtime();
+            } else if (currentUser && currentUser.type === 'collab') {
+                await renderCollabDashboard();
+            }
+        } catch (error) {
+            console.error('Erreur dans saveAndReload :', error);
+            alert('Une erreur est survenue lors de la sauvegarde/rechargement. Vérifiez la console.');
         }
     }
 
+    // ===== TOGGLE ACTIF =====
     async function toggleActif(id, checked) {
         const c = collaborators.find(c => c.id === id);
         if (c) { c.actif = checked; await saveAndReload(); }
     }
 
+    // ===== FORMULAIRES COLLABORATEURS =====
     function buildCollabForm(c) {
         const actif = c?.actif !== undefined ? c.actif : true;
         return `<div class="row g-3">
@@ -1001,6 +1006,7 @@
         };
     }
 
+    // ===== AJOUT / MODIFICATION / SUPPRESSION COLLABORATEUR =====
     async function showAddCollabModal() {
         openRhModal('Nouveau collaborateur', buildCollabForm(null), async () => {
             const data = readCollabForm();
@@ -1009,7 +1015,7 @@
             const totpSecret = generateTotpSecret();
             const newCollab = { id: newId, totpSecret, totpActive: false, ...data };
             collaborators.push(newCollab);
-            // Créer automatiquement un planning
+            // Planning
             plannings.push({
                 id: `plan_${newId}`,
                 collaboratorId: newId,
@@ -1021,7 +1027,7 @@
                     { type: "aprem", start: "15:30", duration: 15 }
                 ]
             });
-            // Créer un contrat par défaut (CDI)
+            // Contrat par défaut
             contracts.push({
                 id: 'ct_' + Date.now(),
                 collaboratorId: newId,
@@ -1047,21 +1053,67 @@
         });
     }
 
+    // ===== SUPPRESSION ROBUSTE =====
     async function deleteCollab(id) {
-        if (!confirm('Supprimer ?')) return;
-        collaborators = collaborators.filter(c => c.id !== id);
-        pointages = pointages.filter(p => p.collaboratorId !== id);
-        absences = absences.filter(a => a.collaboratorId !== id);
-        comments = comments.filter(c => c.collaboratorId !== id);
-        pauses = pauses.filter(p => p.collaboratorId !== id);
-        contracts = contracts.filter(ct => ct.collaboratorId !== id);
-        leaveRequests = leaveRequests.filter(l => l.collaboratorId !== id);
-        plannings = plannings.filter(p => p.collaboratorId !== id);
-        teams.forEach(t => { if (t.chefId === id) t.chefId = null; t.members = t.members.filter(m => m !== id); });
-        await saveAndReload();
-        ensurePauseRotation();
+        if (!confirm('Supprimer définitivement ce collaborateur et toutes ses données associées ?')) return;
+        try {
+            const deletePromises = [];
+            // Collaborateur
+            deletePromises.push(fbDeleteDoc('collaborators', id));
+            // Pointages
+            const pts = pointages.filter(p => p.collaboratorId === id);
+            for (const p of pts) deletePromises.push(fbDeleteDoc('pointages', p.id));
+            // Absences
+            const abs = absences.filter(a => a.collaboratorId === id);
+            for (const a of abs) deletePromises.push(fbDeleteDoc('absences', a.id));
+            // Commentaires
+            const coms = comments.filter(c => c.collaboratorId === id);
+            for (const c of coms) deletePromises.push(fbDeleteDoc('comments', c.id));
+            // Pauses
+            const paus = pauses.filter(p => p.collaboratorId === id);
+            for (const p of paus) deletePromises.push(fbDeleteDoc('pauses', p.id));
+            // Contrats
+            const ctrs = contracts.filter(ct => ct.collaboratorId === id);
+            for (const ct of ctrs) deletePromises.push(fbDeleteDoc('contracts', ct.id));
+            // Congés
+            const leaves = leaveRequests.filter(l => l.collaboratorId === id);
+            for (const l of leaves) deletePromises.push(fbDeleteDoc('leaveRequests', l.id));
+            // Plannings
+            const plans = plannings.filter(p => p.collaboratorId === id);
+            for (const p of plans) deletePromises.push(fbDeleteDoc('plannings', p.id));
+            // Équipes (mise à jour)
+            for (const team of teams) {
+                if (team.chefId === id) {
+                    team.chefId = null;
+                    deletePromises.push(fbSaveDoc('teams', team.id, team));
+                }
+                if (team.members && team.members.includes(id)) {
+                    team.members = team.members.filter(m => m !== id);
+                    deletePromises.push(fbSaveDoc('teams', team.id, team));
+                }
+            }
+            await Promise.all(deletePromises);
+            // Mise à jour locale
+            collaborators = collaborators.filter(c => c.id !== id);
+            pointages = pointages.filter(p => p.collaboratorId !== id);
+            absences = absences.filter(a => a.collaboratorId !== id);
+            comments = comments.filter(c => c.collaboratorId !== id);
+            pauses = pauses.filter(p => p.collaboratorId !== id);
+            contracts = contracts.filter(ct => ct.collaboratorId !== id);
+            leaveRequests = leaveRequests.filter(l => l.collaboratorId !== id);
+            plannings = plannings.filter(p => p.collaboratorId !== id);
+            teams.forEach(t => { if (t.chefId === id) t.chefId = null; t.members = t.members.filter(m => m !== id); });
+            await loadAllData();
+            await renderAllAdminTabs();
+            ensurePauseRotation();
+            alert('Collaborateur supprimé avec succès.');
+        } catch (error) {
+            console.error('Erreur lors de la suppression :', error);
+            alert('Erreur lors de la suppression. Vérifiez la console pour plus de détails.');
+        }
     }
 
+    // ===== FICHE COLLABORATEUR =====
     function showFicheCollab(id) {
         const c = collaborators.find(co => co.id === id);
         const contrat = contracts.find(ct => ct.collaboratorId === id && ct.actif);
@@ -1093,6 +1145,7 @@
         </div>`, null);
     }
 
+    // ===== TOTP =====
     function showTotpQr(collabId) {
         const c = collaborators.find(c => c.id === collabId);
         if (!c) return;
@@ -1829,7 +1882,7 @@
         } else alert('Annulé ou mot de passe trop court');
     }
 
-    // Fonction de rafraîchissement améliorée
+    // ===== REFRESH =====
     async function refreshAllTabs() {
         await loadAllData();
         if (currentUser && currentUser.type === 'admin') {
