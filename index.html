@@ -13,7 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <style>
-        /* ===== ROOT & VARIABLES ===== */
+        /* ===== ROOT & VARIABLES (inchangé) ===== */
         :root {
             --bg: #f0f4fb;
             --card-bg: rgba(255, 255, 255, 0.85);
@@ -61,7 +61,7 @@
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-thumb { background: var(--primary-light); border-radius: 10px; }
 
-        /* ===== LOGIN ===== */
+        /* ===== LOGIN (inchangé) ===== */
         .login-wrapper {
             min-height: 100vh;
             background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #312e81 100%);
@@ -392,7 +392,7 @@
         <span class="navbar-brand"><i class="fas fa-bolt"></i> AllAcces <span style="font-weight:400;font-size:0.7rem;opacity:0.6;">RH</span></span>
     </div>
     <div class="navbar-actions">
-        <button id="btnRefreshAll" class="btn btn-outline-light btn-sm d-none" onclick="refreshAllTabs()" style="border-radius:40px;padding:4px 16px;"><i class="fas fa-sync-alt"></i> Actualiser</button>
+        <button id="btnRefreshAll" class="btn btn-outline-light btn-sm" onclick="refreshAllTabs()" style="border-radius:40px;padding:4px 16px;"><i class="fas fa-sync-alt"></i> Actualiser</button>
         <button id="btnLogout" class="btn btn-outline-light btn-sm" style="border-radius:40px;padding:4px 16px;"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
     </div>
 </nav>
@@ -738,6 +738,8 @@
         document.getElementById('collabLoginForm').classList.add('d-none');
         document.getElementById('adminPass').value = '';
         closeSidebar();
+        // Arrêter l'écoute des pauses
+        stopPausesRealtime();
     }
     document.getElementById('btnLogout').addEventListener('click', logout);
     document.getElementById('sidebarLogout').addEventListener('click', logout);
@@ -777,11 +779,12 @@
 
     async function showInterface() {
         document.getElementById('loginScreen').classList.add('d-none');
+        // Charger les données avant d'afficher
+        await loadAllData();
         if (currentUser.type === 'admin') {
             document.getElementById('adminPanel').classList.remove('d-none');
             document.getElementById('collabPanel').classList.add('d-none');
             document.getElementById('btnRefreshAll').classList.remove('d-none');
-            await loadAllData();
             await renderAllAdminTabs();
             startPausesRealtime();
         } else {
@@ -792,7 +795,21 @@
         }
     }
 
-    async function renderAllAdminTabs() { renderDashboard(); renderCollaborateursList(); renderEquipes(); renderContratsList(); renderPlanification(); renderConges(); renderOrganigramme(); renderPointagesList(); renderAbsences(); renderCommentaires(); renderPausesTab(); renderRapports(); renderParametres(); }
+    async function renderAllAdminTabs() {
+        renderDashboard();
+        renderCollaborateursList();
+        renderEquipes();
+        renderContratsList();
+        renderPlanification();
+        renderConges();
+        renderOrganigramme();
+        renderPointagesList();
+        renderAbsences();
+        renderCommentaires();
+        renderPausesTab();
+        renderRapports();
+        renderParametres();
+    }
 
     // ==================== DASHBOARD ====================
     function renderDashboard() {
@@ -918,9 +935,21 @@
         return { total, pris, restants: total - pris };
     }
 
+    // Fonction générique pour sauvegarder et recharger
+    async function saveAndReload() {
+        await saveAllData();
+        await loadAllData();
+        if (currentUser && currentUser.type === 'admin') {
+            await renderAllAdminTabs();
+            startPausesRealtime();
+        } else if (currentUser && currentUser.type === 'collab') {
+            await renderCollabDashboard();
+        }
+    }
+
     async function toggleActif(id, checked) {
         const c = collaborators.find(c => c.id === id);
-        if (c) { c.actif = checked; await saveAllData(); renderCollaborateursList(); renderDashboard(); }
+        if (c) { c.actif = checked; await saveAndReload(); }
     }
 
     function buildCollabForm(c) {
@@ -980,6 +1009,7 @@
             const totpSecret = generateTotpSecret();
             const newCollab = { id: newId, totpSecret, totpActive: false, ...data };
             collaborators.push(newCollab);
+            // Créer automatiquement un planning
             plannings.push({
                 id: `plan_${newId}`,
                 collaboratorId: newId,
@@ -991,9 +1021,17 @@
                     { type: "aprem", start: "15:30", duration: 15 }
                 ]
             });
-            await saveAllData();
-            renderCollaborateursList();
-            renderDashboard();
+            // Créer un contrat par défaut (CDI)
+            contracts.push({
+                id: 'ct_' + Date.now(),
+                collaboratorId: newId,
+                type: 'CDI',
+                actif: true,
+                dateDebut: getTodayStr(),
+                dateFin: '',
+                notes: ''
+            });
+            await saveAndReload();
             ensurePauseRotation();
         });
     }
@@ -1004,8 +1042,7 @@
             const data = readCollabForm();
             if (!data.name) return alert('Nom requis');
             Object.assign(c, data);
-            await saveAllData();
-            renderCollaborateursList();
+            await saveAndReload();
             ensurePauseRotation();
         });
     }
@@ -1021,9 +1058,7 @@
         leaveRequests = leaveRequests.filter(l => l.collaboratorId !== id);
         plannings = plannings.filter(p => p.collaboratorId !== id);
         teams.forEach(t => { if (t.chefId === id) t.chefId = null; t.members = t.members.filter(m => m !== id); });
-        await saveAllData();
-        renderCollaborateursList();
-        renderDashboard();
+        await saveAndReload();
         ensurePauseRotation();
     }
 
@@ -1070,11 +1105,11 @@
         );
     }
 
-    function activateTotp(collabId) {
+    async function activateTotp(collabId) {
         const c = collaborators.find(c => c.id === collabId);
         const code = document.getElementById('totpActivationCode')?.value;
         if (!code || code.length !== 6) { alert('Code 6 chiffres requis'); return; }
-        if (verifyTotp(c.totpSecret, code)) { c.totpActive = true; saveAllData(); closeModal(); alert('TOTP activé avec succès !'); renderCollaborateursList(); if (currentUser && currentUser.type === 'collab' && currentUser.id === collabId) renderCollabDashboard(); } else { alert('Code invalide.'); }
+        if (verifyTotp(c.totpSecret, code)) { c.totpActive = true; await saveAndReload(); closeModal(); alert('TOTP activé avec succès !'); } else { alert('Code invalide.'); }
     }
 
     function exportCollabsExcel() {
@@ -1109,7 +1144,7 @@
     }
 
     async function showAddEquipeModal() {
-        openRhModal('Nouvelle équipe', buildEquipeForm(null), () => {
+        openRhModal('Nouvelle équipe', buildEquipeForm(null), async () => {
             const name = document.getElementById('eq_name')?.value?.trim();
             if (!name) return alert('Nom requis');
             const chefId = parseInt(document.getElementById('eq_chef')?.value) || null;
@@ -1117,28 +1152,24 @@
             const dept = document.getElementById('eq_dept')?.value?.trim() || '';
             const id = 'team_' + Date.now();
             teams.push({ id, name, chefId, members, departement: dept });
-            saveAllData();
-            renderEquipes();
-            renderCollaborateursList();
+            await saveAndReload();
         });
     }
 
     async function editEquipe(id) {
         const t = teams.find(t => t.id === id);
-        openRhModal('Modifier équipe', buildEquipeForm(t), () => {
+        openRhModal('Modifier équipe', buildEquipeForm(t), async () => {
             t.name = document.getElementById('eq_name')?.value?.trim();
             if (!t.name) return alert('Nom requis');
             t.chefId = parseInt(document.getElementById('eq_chef')?.value) || null;
             t.members = [...document.querySelectorAll('[id^="eq_m_"]:checked')].map(el => parseInt(el.value));
             t.departement = document.getElementById('eq_dept')?.value?.trim() || '';
-            saveAllData();
-            renderEquipes();
-            renderCollaborateursList();
+            await saveAndReload();
         });
     }
 
     async function deleteEquipe(id) {
-        if (confirm('Supprimer cette équipe ?')) { teams = teams.filter(t => t.id !== id); saveAllData(); renderEquipes(); }
+        if (confirm('Supprimer cette équipe ?')) { teams = teams.filter(t => t.id !== id); await saveAndReload(); }
     }
 
     // ===== CONTRATS =====
@@ -1171,34 +1202,30 @@
     }
 
     async function showAddContratModal() {
-        openRhModal('Nouveau contrat', buildContratForm(null), () => {
+        openRhModal('Nouveau contrat', buildContratForm(null), async () => {
             const collabId = parseInt(document.getElementById('ct_collab')?.value);
             if (!collabId) return alert('Collaborateur requis');
             const id = 'ct_' + Date.now();
             contracts.push({ id, collaboratorId: collabId, type: document.getElementById('ct_type')?.value || 'CDI', actif: document.getElementById('ct_actif')?.value === 'true', dateDebut: document.getElementById('ct_debut')?.value || '', dateFin: document.getElementById('ct_fin')?.value || '', notes: document.getElementById('ct_notes')?.value?.trim() || '' });
-            saveAllData();
-            renderContratsList();
-            renderCollaborateursList();
+            await saveAndReload();
         });
     }
 
     async function editContrat(id) {
         const ct = contracts.find(c => c.id === id);
-        openRhModal('Modifier contrat', buildContratForm(ct), () => {
+        openRhModal('Modifier contrat', buildContratForm(ct), async () => {
             ct.collaboratorId = parseInt(document.getElementById('ct_collab')?.value);
             ct.type = document.getElementById('ct_type')?.value;
             ct.actif = document.getElementById('ct_actif')?.value === 'true';
             ct.dateDebut = document.getElementById('ct_debut')?.value;
             ct.dateFin = document.getElementById('ct_fin')?.value;
             ct.notes = document.getElementById('ct_notes')?.value?.trim() || '';
-            saveAllData();
-            renderContratsList();
-            renderCollaborateursList();
+            await saveAndReload();
         });
     }
 
     async function deleteContrat(id) {
-        if (confirm('Supprimer ce contrat ?')) { contracts = contracts.filter(c => c.id !== id); saveAllData(); renderContratsList(); renderCollaborateursList(); }
+        if (confirm('Supprimer ce contrat ?')) { contracts = contracts.filter(c => c.id !== id); await saveAndReload(); }
     }
 
     // ===== PLANIFICATION =====
@@ -1225,15 +1252,15 @@
             return `<div class="row g-2 mb-2"><div class="col-4"><label style="font-size:0.85rem;">${PAUSE_CONFIG[type].label}</label></div><div class="col-4"><input type="time" class="form-control" id="break_${type}_start" value="${b.start}"></div><div class="col-4"><input type="number" class="form-control" id="break_${type}_dur" value="${b.duration}" step="5" min="0"></div></div>`;
         }).join('');
         const form = `<div class="row g-3"><div class="col-6"><label class="form-label fw500">Heure d'arrivée prévue</label><input type="time" id="plan_start" class="form-control" value="${plan.startTime}"></div><div class="col-6"><label class="form-label fw500">Heure de départ prévue</label><input type="time" id="plan_end" class="form-control" value="${plan.endTime}"></div><div class="col-12"><h6 style="font-weight:600;">Pauses recommandées</h6>${breaksHtml}</div></div>`;
-        openRhModal(`Planning de ${getFullName(c)}`, form, () => {
+        openRhModal(`Planning de ${getFullName(c)}`, form, async () => {
             plan.startTime = document.getElementById('plan_start').value;
             plan.endTime = document.getElementById('plan_end').value;
             for (const type of ['matin', 'dejeuner', 'aprem']) {
                 const b = plan.breaks.find(b => b.type === type);
                 if (b) { b.start = document.getElementById(`break_${type}_start`).value; b.duration = parseInt(document.getElementById(`break_${type}_dur`).value); } else { plan.breaks.push({ type, start: document.getElementById(`break_${type}_start`).value, duration: parseInt(document.getElementById(`break_${type}_dur`).value) }); }
             }
-            saveAllData();
-            renderPlanification(); if (currentUser.type === 'collab' && currentUser.id === collabId) renderCollabDashboard();
+            await saveAndReload();
+            if (currentUser.type === 'collab' && currentUser.id === collabId) renderCollabDashboard();
         });
     }
 
@@ -1273,26 +1300,24 @@
     }
 
     async function showAddCongeModal() {
-        openRhModal('Nouvelle demande de congé', buildCongeForm(), () => {
+        openRhModal('Nouvelle demande de congé', buildCongeForm(), async () => {
             const collabId = parseInt(document.getElementById('cg_collab')?.value);
             if (!collabId) return alert('Collaborateur requis');
             const dateDebut = document.getElementById('cg_debut')?.value, dateFin = document.getElementById('cg_fin')?.value;
             if (!dateDebut || !dateFin) return alert('Dates requises');
             const id = 'cg_' + Date.now();
             leaveRequests.push({ id, collaboratorId: collabId, type: document.getElementById('cg_type')?.value, statut: document.getElementById('cg_statut')?.value, dateDebut, dateFin, nbJours: parseFloat(document.getElementById('cg_jours')?.value) || 1, motif: document.getElementById('cg_motif')?.value?.trim() || '', createdAt: getTodayStr() });
-            saveAllData();
-            renderConges();
-            renderCollaborateursList();
+            await saveAndReload();
         });
     }
 
     async function validerConge(id, statut) {
         const l = leaveRequests.find(l => l.id === id);
-        if (l) { l.statut = statut; saveAllData(); renderConges(); renderCollaborateursList(); }
+        if (l) { l.statut = statut; await saveAndReload(); }
     }
 
     async function deleteConge(id) {
-        if (confirm('Supprimer cette demande ?')) { leaveRequests = leaveRequests.filter(l => l.id !== id); saveAllData(); renderConges(); renderCollaborateursList(); }
+        if (confirm('Supprimer cette demande ?')) { leaveRequests = leaveRequests.filter(l => l.id !== id); await saveAndReload(); }
     }
 
     // ===== ORGANIGRAMME =====
@@ -1402,7 +1427,7 @@
         const existing = pointages.find(p => p.collaboratorId === collaboratorId && p.date === date && p.type === type);
         const now = getNowStr();
         if (existing) { existing.time = now; existing.signe = true; } else { const newId = (await getNextId('pointage')).toString(); pointages.push({ id: newId, collaboratorId, date, type, time: now, signe: true }); }
-        saveAllData();
+        await saveAndReload();
     }
 
     async function signFromAdmin(collabId, date, type) {
@@ -1415,13 +1440,11 @@
                 return showTotpVerification(async token => {
                     if (verifyTotp(collab.totpSecret, token)) {
                         await recordSignature(collabId, date, type);
-                        renderPointagesList();
                         return true;
                     } else { alert('Code TOTP invalide'); return false; }
                 });
             } else {
                 await recordSignature(collabId, date, type);
-                renderPointagesList();
                 return true;
             }
         });
@@ -1446,9 +1469,8 @@
         if (!date || !time) return;
         const newId = (await getNextId('pointage')).toString();
         pointages.push({ id: newId, collaboratorId: collabId, date, type, time, signe: false });
-        saveAllData();
+        await saveAndReload();
         closeModal();
-        renderPointagesList();
     }
 
     async function editPointage(id) {
@@ -1460,11 +1482,11 @@
 
     async function updatePointage(id) {
         const p = pointages.find(p => p.id === id);
-        if (p) { p.date = document.getElementById('editDate').value; p.type = document.getElementById('editType').value; p.time = document.getElementById('editTime').value; saveAllData(); closeModal(); renderPointagesList(); }
+        if (p) { p.date = document.getElementById('editDate').value; p.type = document.getElementById('editType').value; p.time = document.getElementById('editTime').value; await saveAndReload(); closeModal(); }
     }
 
     async function deletePointage(id) {
-        if (confirm('Supprimer ?')) { pointages = pointages.filter(p => p.id !== id); saveAllData(); renderPointagesList(); }
+        if (confirm('Supprimer ?')) { pointages = pointages.filter(p => p.id !== id); await saveAndReload(); }
     }
 
     // ===== ABSENCES =====
@@ -1492,14 +1514,12 @@
     async function addAbsenceFromModal() {
         const newId = (await getNextId('absence')).toString();
         absences.push({ id: newId, collaboratorId: parseInt(document.getElementById('absCollab').value), startDate: document.getElementById('absStart').value, endDate: document.getElementById('absEnd').value, type: document.getElementById('absType').value, reason: document.getElementById('absReason').value });
-        saveAllData();
+        await saveAndReload();
         closeModal();
-        renderAbsences();
-        renderDashboard();
     }
 
     async function deleteAbsence(id) {
-        if (confirm('Supprimer ?')) { absences = absences.filter(a => a.id !== id); saveAllData(); renderAbsences(); renderDashboard(); }
+        if (confirm('Supprimer ?')) { absences = absences.filter(a => a.id !== id); await saveAndReload(); }
     }
 
     // ===== COMMENTAIRES =====
@@ -1519,14 +1539,13 @@
         const today = getTodayStr();
         const existing = comments.find(c => c.collaboratorId === collabId && c.date === today);
         if (existing) { if (text === '') comments = comments.filter(c => c.id !== existing.id); else existing.text = text; } else if (text) { const newId = (await getNextId('comment')).toString(); comments.push({ id: newId, collaboratorId: collabId, date: today, text }); }
-        saveAllData();
-        renderCommentaires();
+        await saveAndReload();
     }
 
     async function deleteComment(collabId) {
         const today = getTodayStr();
         const existing = comments.find(c => c.collaboratorId === collabId && c.date === today);
-        if (existing) { comments = comments.filter(c => c.id !== existing.id); saveAllData(); renderCommentaires(); }
+        if (existing) { comments = comments.filter(c => c.id !== existing.id); await saveAndReload(); }
     }
 
     // ===== PAUSES =====
@@ -1750,8 +1769,7 @@
         if (!settings.admin.passwords) settings.admin.passwords = ['admin123'];
         if (settings.admin.passwords.includes(newPwd)) return alert('Déjà existant');
         settings.admin.passwords.push(newPwd);
-        await saveAllData();
-        renderParametres();
+        await saveAndReload();
         alert('Mot de passe ajouté');
     }
 
@@ -1759,29 +1777,28 @@
         if (!confirm(`Supprimer ce mot de passe ?`)) return;
         settings.admin.passwords = settings.admin.passwords.filter(p => p !== pwd);
         if (settings.admin.passwords.length === 0) settings.admin.passwords = ['admin123'];
-        await saveAllData();
-        renderParametres();
+        await saveAndReload();
     }
 
     async function toggleTheme() {
         const isDark = document.getElementById('themeSwitch').checked;
         document.body.classList.toggle('dark', isDark);
         settings.theme = isDark ? 'dark' : 'light';
-        saveAllData();
+        await saveAndReload();
     }
 
     async function saveAdminEmail() {
         const email = document.getElementById('adminEmailInput').value.trim();
         if (!email || !email.includes('@')) return alert('Email invalide');
         settings.admin.email = email;
-        saveAllData();
+        await saveAndReload();
         alert('Email enregistré');
     }
 
     async function changeSecurityMode() {
         const mode = document.getElementById('securityModeSelect').value;
         settings.securityMode = mode;
-        saveAllData();
+        await saveAndReload();
         alert('Mode sécurité mis à jour');
     }
 
@@ -1790,9 +1807,8 @@
         if (!/^\d{4}$/.test(newPin)) return alert('PIN invalide (4 chiffres)');
         const c = collaborators.find(c => c.id === id);
         if (c) c.pin = newPin;
-        saveAllData();
+        await saveAndReload();
         alert('PIN modifié');
-        renderParametres();
     }
 
     function showResetPasswordModal() {
@@ -1807,13 +1823,20 @@
         if (newPwd && newPwd.length >= 4) {
             if (!settings.admin.passwords) settings.admin.passwords = ['admin123'];
             settings.admin.passwords.push(newPwd);
-            saveAllData();
+            saveAndReload();
             alert('Mot de passe ajouté à la liste');
             closeModal();
         } else alert('Annulé ou mot de passe trop court');
     }
 
-    async function refreshAllTabs() { await renderAllAdminTabs(); }
+    // Fonction de rafraîchissement améliorée
+    async function refreshAllTabs() {
+        await loadAllData();
+        if (currentUser && currentUser.type === 'admin') {
+            await renderAllAdminTabs();
+            startPausesRealtime();
+        }
+    }
 
     // ===== ATTESTATION PDF =====
     async function genererAttestationPDF(collabId) {
@@ -1924,16 +1947,14 @@
                     if (verifyTotp(collab.totpSecret, token)) {
                         const newId = `pause_${currentUser.id}_${today}_${type}`;
                         pauses.push({ id: newId, collaboratorId: currentUser.id, date: today, type, debut: getNowStr(), fin: null, depassement: false });
-                        saveAllData();
-                        await renderCollabDashboard();
+                        await saveAndReload();
                         return true;
                     } else { alert('Code TOTP invalide'); return false; }
                 });
             } else {
                 const newId = `pause_${currentUser.id}_${today}_${type}`;
                 pauses.push({ id: newId, collaboratorId: currentUser.id, date: today, type, debut: getNowStr(), fin: null, depassement: false });
-                saveAllData();
-                await renderCollabDashboard();
+                await saveAndReload();
                 return true;
             }
         });
@@ -1954,8 +1975,7 @@
                         const depassement = dureeReelle > PAUSE_CONFIG[en_cours.type].duree;
                         en_cours.fin = fin;
                         en_cours.depassement = depassement;
-                        saveAllData();
-                        await renderCollabDashboard();
+                        await saveAndReload();
                         return true;
                     } else { alert('Code TOTP invalide'); return false; }
                 });
@@ -1965,8 +1985,7 @@
                 const depassement = dureeReelle > PAUSE_CONFIG[en_cours.type].duree;
                 en_cours.fin = fin;
                 en_cours.depassement = depassement;
-                saveAllData();
-                await renderCollabDashboard();
+                await saveAndReload();
                 return true;
             }
         });
@@ -1981,13 +2000,11 @@
                 return showTotpVerification(async token => {
                     if (verifyTotp(collab.totpSecret, token)) {
                         await recordSignature(currentUser.id, getTodayStr(), type);
-                        await renderCollabDashboard();
                         return true;
                     } else { alert('Code TOTP invalide'); return false; }
                 });
             } else {
                 await recordSignature(currentUser.id, getTodayStr(), type);
-                await renderCollabDashboard();
                 return true;
             }
         });
