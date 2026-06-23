@@ -539,6 +539,15 @@
         aprem: { label: 'Pause après-midi', duree: 15, icon: '🧃', color: '#6f42c1' }
     };
 
+    // ==================== FONCTION UTILITAIRE POUR LE NOM COMPLET ====================
+    function getFullName(c) {
+        if (!c) return '';
+        const prenom = c.prenom ? c.prenom.trim() : '';
+        const nom = c.name ? c.name.trim() : '';
+        if (prenom && nom) return prenom + ' ' + nom;
+        return nom || prenom || '?';
+    }
+
     // ==================== FIREBASE HELPERS ====================
     async function fbSaveDoc(collectionName, id, data) { if (!window.db) return; try { await window.fsSetDoc(window.fsDoc(window.db, collectionName, String(id)), data); } catch(e) { console.error(e); } }
     async function fbDeleteDoc(collectionName, id) { if (!window.db) return; try { await window.fsDeleteDoc(window.fsDoc(window.db, collectionName, String(id))); } catch(e) { console.error(e); } }
@@ -620,9 +629,9 @@
 
     async function initDefaultData() {
         collaborators = [
-            { id: 1, name: "Alice Martin", prenom: "Alice", department: "Opération 01", poste: "Responsable commercial", phone: "0612345678", email: "alice@softcall.com", dateEntree: "2020-01-15", soldeConges: 22, pin: "1234", rib: "", cnss: "", totpSecret: generateTotpSecret(), totpActive: false, notes: "", company: "SOFTCALL", actif: true, matricule: "A001" },
-            { id: 2, name: "Bob Dupont", prenom: "Bob", department: "Opération 08", poste: "Développeur", phone: "0698765432", email: "bob@softcall.com", dateEntree: "2021-06-01", soldeConges: 22, pin: "1234", rib: "TN987654321", cnss: "", totpSecret: generateTotpSecret(), totpActive: false, notes: "", company: "NORTALIS", actif: true, matricule: "B002" },
-            { id: 3, name: "Claire Legrand", prenom: "Claire", department: "Opération 01", poste: "Assistante", phone: "0678901234", email: "claire@softcall.com", dateEntree: "2022-02-10", soldeConges: 22, pin: "1234", rib: "", cnss: "12348765", totpSecret: generateTotpSecret(), totpActive: false, notes: "", company: "SOFTCALL", actif: true, matricule: "C003" }
+            { id: 1, name: "Martin", prenom: "Alice", department: "Opération 01", poste: "Responsable commercial", phone: "0612345678", email: "alice@softcall.com", dateEntree: "2020-01-15", soldeConges: 22, pin: "1234", rib: "", cnss: "", totpSecret: generateTotpSecret(), totpActive: false, notes: "", company: "SOFTCALL", actif: true, matricule: "A001" },
+            { id: 2, name: "Dupont", prenom: "Bob", department: "Opération 08", poste: "Développeur", phone: "0698765432", email: "bob@softcall.com", dateEntree: "2021-06-01", soldeConges: 22, pin: "1234", rib: "TN987654321", cnss: "", totpSecret: generateTotpSecret(), totpActive: false, notes: "", company: "NORTALIS", actif: true, matricule: "B002" },
+            { id: 3, name: "Legrand", prenom: "Claire", department: "Opération 01", poste: "Assistante", phone: "0678901234", email: "claire@softcall.com", dateEntree: "2022-02-10", soldeConges: 22, pin: "1234", rib: "", cnss: "12348765", totpSecret: generateTotpSecret(), totpActive: false, notes: "", company: "SOFTCALL", actif: true, matricule: "C003" }
         ];
         for (const c of collaborators) {
             plannings.push({
@@ -674,7 +683,7 @@
         const select = document.getElementById('collabSelect');
         if (select) {
             const actifs = collaborators.filter(c => c.actif !== false);
-            select.innerHTML = '<option value="">-- Choisir --</option>' + actifs.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            select.innerHTML = '<option value="">-- Choisir --</option>' + actifs.map(c => `<option value="${c.id}">${getFullName(c)}</option>`).join('');
         }
     }
 
@@ -752,17 +761,13 @@
             const tabId = this.dataset.tab;
             const tabElement = document.getElementById(tabId);
             if (tabElement) {
-                // Activer l'onglet correspondant
                 const tabTrigger = document.querySelector(`.nav-tabs-scroll .nav-link[data-bs-target="#${tabId}"]`);
                 if (tabTrigger) {
-                    // Simuler un clic sur l'onglet
                     const bsTab = new bootstrap.Tab(tabTrigger);
                     bsTab.show();
                 }
-                // Mettre à jour la classe active sur les onglets
                 document.querySelectorAll('.nav-tabs-scroll .nav-link').forEach(link => link.classList.remove('active'));
                 if (tabTrigger) tabTrigger.classList.add('active');
-                // Activer le panneau
                 document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('show', 'active'));
                 tabElement.classList.add('show', 'active');
             }
@@ -834,7 +839,7 @@
                     collaborators.filter(c => c.actif !== false && filtered.some(p=>p.collaboratorId===c.id&&p.type==='arrivee'&&p.signe)).map(c=>{
                         const team = teams.find(t=>t.members?.includes(c.id));
                         const pauseEc = pauses.find(p=>p.collaboratorId===c.id&&p.date===today&&p.debut&&!p.fin);
-                        return `<div class="d-flex align-items-center gap-2 mb-2 p-2 rounded" style="background:var(--bg);border:1px solid var(--border);"><span class="badge ${pauseEc?'bg-warning text-dark':'bg-success'}">${pauseEc?'Pause':'Présent'}</span><strong>${c.name}</strong><small class="text-muted">${team?.name||c.department||''}</small></div>`;
+                        return `<div class="d-flex align-items-center gap-2 mb-2 p-2 rounded" style="background:var(--bg);border:1px solid var(--border);"><span class="badge ${pauseEc?'bg-warning text-dark':'bg-success'}">${pauseEc?'Pause':'Présent'}</span><strong>${getFullName(c)}</strong><small class="text-muted">${team?.name||c.department||''}</small></div>`;
                     }).join('') || '<p class="text-muted">Aucun présent</p>'
                 }</div></div></div>
             </div>`;
@@ -856,7 +861,7 @@
     function renderCollaborateursList() {
         const search = document.getElementById('searchCollab')?.value || '';
         let list = collaborators;
-        if (search) list = list.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || (c.department || '').toLowerCase().includes(search.toLowerCase()));
+        if (search) list = list.filter(c => getFullName(c).toLowerCase().includes(search.toLowerCase()) || (c.department || '').toLowerCase().includes(search.toLowerCase()));
         const html = `<div class="row g-3">${list.map(c => {
             const contrat = contracts.find(ct => ct.collaboratorId === c.id && ct.actif);
             const team = teams.find(t => t.members?.includes(c.id));
@@ -870,7 +875,7 @@
             return `<div class="col-md-6 col-xl-4"><div class="${cardClass} ${!isActif ? 'collab-inactif' : ''}">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <strong>${c.name}</strong> ${isChef?'<span class="chef-badge">Chef</span>':''}
+                        <strong>${getFullName(c)}</strong> ${isChef?'<span class="chef-badge">Chef</span>':''}
                         <span class="badge ${present?'bg-success':'bg-secondary'}">${present?'Présent':'Absent'}</span>
                         <br><small class="text-muted">${c.company || '—'}</small>
                     </div>
@@ -1029,7 +1034,7 @@
         const conges = getSoldeConges(id);
         const mesConges = leaveRequests.filter(l => l.collaboratorId === id);
         const planning = plannings.find(p => p.collaboratorId === id);
-        openRhModal(`Fiche RH — ${c.name}`, `<div class="row g-3">
+        openRhModal(`Fiche RH — ${getFullName(c)}`, `<div class="row g-3">
             <div class="col-md-6"><h6 style="font-weight:600;">Informations personnelles</h6><table class="table table-sm" style="font-size:0.9rem;">${[
                 ['CIN',c.cin],['Naissance',c.dateNaissance],['Genre',c.genre],['Téléphone',c.phone],['Email',c.email],['Adresse',c.adresse],['RIB',c.rib],['N° CNSS',c.cnss],['Société',c.company],['Matricule',c.matricule],['PIN','••••'],['Statut', c.actif !== false ? 'Actif' : 'Inactif']
             ].map(([l,v])=>`<tr><td class="text-muted">${l}</td><td>${v||'—'}</td></tr>`).join('')}</table></div>
@@ -1057,7 +1062,7 @@
         const c = collaborators.find(c => c.id === collabId);
         if (!c) return;
         if (!c.totpSecret) { c.totpSecret = generateTotpSecret(); saveAllData(); }
-        const totp = new OTPAuth.TOTP({ issuer: 'AllAcces', label: c.name, algorithm: 'SHA1', digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(c.totpSecret) });
+        const totp = new OTPAuth.TOTP({ issuer: 'AllAcces', label: getFullName(c), algorithm: 'SHA1', digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(c.totpSecret) });
         const uri = totp.toString();
         const qrSrc = `https://quickchart.io/qr?size=200x200&text=${encodeURIComponent(uri)}`;
         showModal('Configuration Google Authenticator',
@@ -1090,7 +1095,7 @@
         teams.forEach(t => {
             const chef = collaborators.find(c => c.id === t.chefId);
             const members = (t.members || []).map(id => collaborators.find(c => c.id === id)).filter(Boolean);
-            html += `<div class="col-md-4"><div class="rh-card"><div class="d-flex justify-content-between align-items-start"><strong>${t.name}</strong><div><button class="btn btn-xs btn-warning" onclick="editEquipe('${t.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-xs btn-danger" onclick="deleteEquipe('${t.id}')"><i class="fas fa-trash"></i></button></div></div><div class="small"><i class="fas fa-user-tie"></i> Chef : ${chef?.name||'Non assigné'}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">${members.map(m=>`<span class="badge bg-light text-dark border me-1 mb-1" style="border-radius:20px;padding:4px 12px;">${m.name}</span>`).join('')}</div><div class="text-muted small mt-1">${members.length} membre(s) · Opération : ${t.departement||'—'}</div></div></div>`;
+            html += `<div class="col-md-4"><div class="rh-card"><div class="d-flex justify-content-between align-items-start"><strong>${t.name}</strong><div><button class="btn btn-xs btn-warning" onclick="editEquipe('${t.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-xs btn-danger" onclick="deleteEquipe('${t.id}')"><i class="fas fa-trash"></i></button></div></div><div class="small"><i class="fas fa-user-tie"></i> Chef : ${chef?getFullName(chef):'Non assigné'}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">${members.map(m=>`<span class="badge bg-light text-dark border me-1 mb-1" style="border-radius:20px;padding:4px 12px;">${getFullName(m)}</span>`).join('')}</div><div class="text-muted small mt-1">${members.length} membre(s) · Opération : ${t.departement||'—'}</div></div></div>`;
         });
         html += `</div>`;
         document.getElementById('tabEquipes').innerHTML = html;
@@ -1099,8 +1104,8 @@
     function buildEquipeForm(t) {
         return `<div class="mb-3"><label class="form-label fw500">Nom de l'équipe *</label><input class="form-control" id="eq_name" value="${t?.name||''}"></div>
             <div class="mb-3"><label class="form-label fw500">Opération</label><input class="form-control" id="eq_dept" value="${t?.departement||''}"></div>
-            <div class="mb-3"><label class="form-label fw500">Chef d'équipe</label><select class="form-select" id="eq_chef"><option value="">— Aucun —</option>${collaborators.map(c=>`<option value="${c.id}" ${t?.chefId===c.id?'selected':''}>${c.name}</option>`).join('')}</select></div>
-            <div class="mb-3"><label class="form-label fw500">Membres</label><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;">${collaborators.map(c=>`<div class="form-check"><input class="form-check-input" type="checkbox" id="eq_m_${c.id}" value="${c.id}" ${(t?.members||[]).includes(c.id)?'checked':''}> <label class="form-check-label" for="eq_m_${c.id}">${c.name}</label></div>`).join('')}</div></div>`;
+            <div class="mb-3"><label class="form-label fw500">Chef d'équipe</label><select class="form-select" id="eq_chef"><option value="">— Aucun —</option>${collaborators.map(c=>`<option value="${c.id}" ${t?.chefId===c.id?'selected':''}>${getFullName(c)}</option>`).join('')}</select></div>
+            <div class="mb-3"><label class="form-label fw500">Membres</label><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;">${collaborators.map(c=>`<div class="form-check"><input class="form-check-input" type="checkbox" id="eq_m_${c.id}" value="${c.id}" ${(t?.members||[]).includes(c.id)?'checked':''}> <label class="form-check-label" for="eq_m_${c.id}">${getFullName(c)}</label></div>`).join('')}</div></div>`;
     }
 
     async function showAddEquipeModal() {
@@ -1140,21 +1145,24 @@
     function renderContratsList() {
         const search = document.getElementById('searchContrat')?.value || '';
         let list = contracts;
-        if (search) list = list.filter(ct => collaborators.find(c => c.id === ct.collaboratorId)?.name.toLowerCase().includes(search.toLowerCase()));
+        if (search) list = list.filter(ct => {
+            const c = collaborators.find(co => co.id === ct.collaboratorId);
+            return c && getFullName(c).toLowerCase().includes(search.toLowerCase());
+        });
         const soon = contracts.filter(ct => ct.actif && ct.dateFin && (new Date(ct.dateFin) - new Date()) / 86400000 <= 30 && (new Date(ct.dateFin) - new Date()) / 86400000 >= 0);
-        let html = `${soon.length?`<div class="alert alert-warning py-2 px-3 mb-3" style="border-radius:var(--radius-sm);"><i class="fas fa-clock me-2"></i> ${soon.length} contrat(s) expirant dans 30 jours : ${soon.map(ct=>collaborators.find(c=>c.id===ct.collaboratorId)?.name).join(', ')}</div>`:''}
+        let html = `${soon.length?`<div class="alert alert-warning py-2 px-3 mb-3" style="border-radius:var(--radius-sm);"><i class="fas fa-clock me-2"></i> ${soon.length} contrat(s) expirant dans 30 jours : ${soon.map(ct=>collaborators.find(c=>c.id===ct.collaboratorId)).filter(Boolean).map(c=>getFullName(c)).join(', ')}</div>`:''}
             <table class="table table-modern"><thead><tr><th>Collaborateur</th><th>Type</th><th>Date début</th><th>Date fin</th><th>Statut</th><th style="text-align:right;">Actions</th></tr></thead><tbody>`;
         list.forEach(ct => {
             const c = collaborators.find(co => co.id === ct.collaboratorId);
             const expire = ct.dateFin && new Date(ct.dateFin) < new Date();
-            html += `<tr class="${expire?'bg-danger bg-opacity-10':''}"><td><strong>${c?.name||'?'}</strong></td><td><span class="badge ${expire?'badge-contrat-expire':`badge-contrat-${ct.type?.toLowerCase()}`}">${ct.type}</span></td><td>${ct.dateDebut||'—'}</td><td>${ct.dateFin||'Indéterminée'}</td><td>${expire?'Expiré':(ct.actif?'Actif':'Inactif')}</td><td style="text-align:right;"><button class="btn btn-xs btn-warning" onclick="editContrat('${ct.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-xs btn-danger" onclick="deleteContrat('${ct.id}')"><i class="fas fa-trash"></i></button></td></tr>`;
+            html += `<tr class="${expire?'bg-danger bg-opacity-10':''}"><td><strong>${c?getFullName(c):'?'}</strong></td><td><span class="badge ${expire?'badge-contrat-expire':`badge-contrat-${ct.type?.toLowerCase()}`}">${ct.type}</span></td><td>${ct.dateDebut||'—'}</td><td>${ct.dateFin||'Indéterminée'}</td><td>${expire?'Expiré':(ct.actif?'Actif':'Inactif')}</td><td style="text-align:right;"><button class="btn btn-xs btn-warning" onclick="editContrat('${ct.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-xs btn-danger" onclick="deleteContrat('${ct.id}')"><i class="fas fa-trash"></i></button></td></tr>`;
         });
         html += `</tbody></table>`;
         document.getElementById('contratList').innerHTML = html;
     }
 
     function buildContratForm(ct) {
-        return `<div class="row g-3"><div class="col-12"><label class="form-label fw500">Collaborateur *</label><select id="ct_collab" class="form-select">${collaborators.map(c=>`<option value="${c.id}" ${ct?.collaboratorId===c.id?'selected':''}>${c.name}</option>`).join('')}</select></div>
+        return `<div class="row g-3"><div class="col-12"><label class="form-label fw500">Collaborateur *</label><select id="ct_collab" class="form-select">${collaborators.map(c=>`<option value="${c.id}" ${ct?.collaboratorId===c.id?'selected':''}>${getFullName(c)}</option>`).join('')}</select></div>
             <div class="col-md-6"><label class="form-label fw500">Type</label><select id="ct_type" class="form-select"><option value="CDI" ${ct?.type==='CDI'?'selected':''}>CDI</option><option value="CDD" ${ct?.type==='CDD'?'selected':''}>CDD</option><option value="Stage" ${ct?.type==='Stage'?'selected':''}>Stage</option></select></div>
             <div class="col-md-6"><label class="form-label fw500">Actif</label><select id="ct_actif" class="form-select"><option value="true" ${ct?.actif!==false?'selected':''}>Actif</option><option value="false" ${ct?.actif===false?'selected':''}>Inactif</option></select></div>
             <div class="col-md-6"><label class="form-label fw500">Date début</label><input type="date" id="ct_debut" class="form-control" value="${ct?.dateDebut||''}"></div>
@@ -1200,7 +1208,7 @@
             if (c.actif === false) continue;
             const plan = plannings.find(p => p.collaboratorId === c.id);
             if (!plan) continue;
-            html += `<div class="col-md-4"><div class="rh-card"><div class="d-flex justify-content-between"><strong>${c.name}</strong> <span class="badge bg-secondary">${c.company||'—'}</span></div>
+            html += `<div class="col-md-4"><div class="rh-card"><div class="d-flex justify-content-between"><strong>${getFullName(c)}</strong> <span class="badge bg-secondary">${c.company||'—'}</span></div>
                 <table class="table table-sm mt-2" style="font-size:0.85rem;"><tr><td class="text-muted">Arrivée prévue</td><td>${plan.startTime}</td></tr><tr><td class="text-muted">Départ prévue</td><td>${plan.endTime}</td></tr><tr><td colspan="2"><strong>Pauses recommandées</strong></td></tr>${plan.breaks.map(b => `<tr><td>${PAUSE_CONFIG[b.type]?.label || b.type}</td><td>${b.start} (${b.duration} min)</td></tr>`).join('')}</table>
                 <button class="btn btn-sm btn-outline-primary" onclick="editPlanning(${c.id})" style="border-radius:40px;"><i class="fas fa-edit me-1"></i>Modifier</button></div></div>`;
         }
@@ -1217,7 +1225,7 @@
             return `<div class="row g-2 mb-2"><div class="col-4"><label style="font-size:0.85rem;">${PAUSE_CONFIG[type].label}</label></div><div class="col-4"><input type="time" class="form-control" id="break_${type}_start" value="${b.start}"></div><div class="col-4"><input type="number" class="form-control" id="break_${type}_dur" value="${b.duration}" step="5" min="0"></div></div>`;
         }).join('');
         const form = `<div class="row g-3"><div class="col-6"><label class="form-label fw500">Heure d'arrivée prévue</label><input type="time" id="plan_start" class="form-control" value="${plan.startTime}"></div><div class="col-6"><label class="form-label fw500">Heure de départ prévue</label><input type="time" id="plan_end" class="form-control" value="${plan.endTime}"></div><div class="col-12"><h6 style="font-weight:600;">Pauses recommandées</h6>${breaksHtml}</div></div>`;
-        openRhModal(`Planning de ${c.name}`, form, () => {
+        openRhModal(`Planning de ${getFullName(c)}`, form, () => {
             plan.startTime = document.getElementById('plan_start').value;
             plan.endTime = document.getElementById('plan_end').value;
             for (const type of ['matin', 'dejeuner', 'aprem']) {
@@ -1240,14 +1248,14 @@
         list.forEach(l => {
             const c = collaborators.find(co => co.id === l.collaboratorId);
             const badgeClass = l.statut === 'approuve' ? 'bg-success' : l.statut === 'rejete' ? 'bg-danger' : 'bg-warning text-dark';
-            html += `<div class="col-md-6"><div class="rh-card" style="border-left:4px solid ${l.statut==='approuve'?'var(--success)':l.statut==='rejete'?'var(--danger)':'var(--warning)'};"><div class="d-flex justify-content-between"><div><strong>${c?.name||'?'}</strong> <span class="badge ${badgeClass}">${l.statut.replace('_',' ')}</span></div><div>${l.statut==='en_attente'?`<button class="btn btn-xs btn-success" onclick="validerConge('${l.id}','approuve')"><i class="fas fa-check"></i></button> <button class="btn btn-xs btn-danger" onclick="validerConge('${l.id}','rejete')"><i class="fas fa-times"></i></button>`:''}<button class="btn btn-xs btn-danger" onclick="deleteConge('${l.id}')"><i class="fas fa-trash"></i></button></div></div><div class="small mt-1"><span class="badge bg-secondary">${l.type}</span> ${l.dateDebut} → ${l.dateFin} <strong>(${l.nbJours}j)</strong></div>${l.motif?`<div class="small text-muted mt-1">${l.motif}</div>`:''}</div></div>`;
+            html += `<div class="col-md-6"><div class="rh-card" style="border-left:4px solid ${l.statut==='approuve'?'var(--success)':l.statut==='rejete'?'var(--danger)':'var(--warning)'};"><div class="d-flex justify-content-between"><div><strong>${c?getFullName(c):'?'}</strong> <span class="badge ${badgeClass}">${l.statut.replace('_',' ')}</span></div><div>${l.statut==='en_attente'?`<button class="btn btn-xs btn-success" onclick="validerConge('${l.id}','approuve')"><i class="fas fa-check"></i></button> <button class="btn btn-xs btn-danger" onclick="validerConge('${l.id}','rejete')"><i class="fas fa-times"></i></button>`:''}<button class="btn btn-xs btn-danger" onclick="deleteConge('${l.id}')"><i class="fas fa-trash"></i></button></div></div><div class="small mt-1"><span class="badge bg-secondary">${l.type}</span> ${l.dateDebut} → ${l.dateFin} <strong>(${l.nbJours}j)</strong></div>${l.motif?`<div class="small text-muted mt-1">${l.motif}</div>`:''}</div></div>`;
         });
         html += `</div>`;
         document.getElementById('tabConges').innerHTML = html;
     }
 
     function buildCongeForm() {
-        return `<div class="row g-3"><div class="col-12"><label class="form-label fw500">Collaborateur *</label><select id="cg_collab" class="form-select">${collaborators.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div>
+        return `<div class="row g-3"><div class="col-12"><label class="form-label fw500">Collaborateur *</label><select id="cg_collab" class="form-select">${collaborators.map(c=>`<option value="${c.id}">${getFullName(c)}</option>`).join('')}</select></div>
             <div class="col-md-6"><label class="form-label fw500">Type</label><select id="cg_type" class="form-select"><option>Congé annuel</option><option>Maladie</option><option>Sans solde</option><option>RTT</option></select></div>
             <div class="col-md-6"><label class="form-label fw500">Statut</label><select id="cg_statut" class="form-select"><option value="en_attente">En attente</option><option value="approuve">Approuvé</option><option value="rejete">Rejeté</option></select></div>
             <div class="col-md-6"><label class="form-label fw500">Date début *</label><input type="date" id="cg_debut" class="form-control" oninput="calcNbJours()"></div>
@@ -1310,13 +1318,13 @@
             for (const t of deptTeams) {
                 const chef = collaborators.find(c => c.id === t.chefId);
                 const members = (t.members || []).map(id => collaborators.find(c => c.id === id)).filter(Boolean);
-                html += `<div class="org-team"><div class="d-flex gap-2 mb-1"><i class="fas fa-users text-success"></i><strong>${t.name}</strong>${chef?`<span class="text-muted small">— Chef : <strong>${chef.name}</strong></span>`:''}<span class="badge bg-success" style="border-radius:40px;">${members.length}</span></div>`;
+                html += `<div class="org-team"><div class="d-flex gap-2 mb-1"><i class="fas fa-users text-success"></i><strong>${t.name}</strong>${chef?`<span class="text-muted small">— Chef : <strong>${getFullName(chef)}</strong></span>`:''}<span class="badge bg-success" style="border-radius:40px;">${members.length}</span></div>`;
                 for (const m of members) {
-                    html += `<div class="org-member d-flex gap-2"><i class="fas fa-user-circle text-muted"></i><span>${m.name}</span>${m.poste?`<small class="text-muted">(${m.poste})</small>`:''}${t.chefId===m.id?'<span class="chef-badge">Chef</span>':''}</div>`;
+                    html += `<div class="org-member d-flex gap-2"><i class="fas fa-user-circle text-muted"></i><span>${getFullName(m)}</span>${m.poste?`<small class="text-muted">(${m.poste})</small>`:''}${t.chefId===m.id?'<span class="chef-badge">Chef</span>':''}</div>`;
                 }
                 html += `</div>`;
             }
-            if (noTeam.length) html += `<div class="org-team"><div class="text-muted small mb-1"><i class="fas fa-user me-1"></i>Sans équipe assignée</div>${noTeam.map(m=>`<div class="org-member">${m.name} ${m.poste?`<small class="text-muted">(${m.poste})</small>`:''}</div>`).join('')}</div>`;
+            if (noTeam.length) html += `<div class="org-team"><div class="text-muted small mb-1"><i class="fas fa-user me-1"></i>Sans équipe assignée</div>${noTeam.map(m=>`<div class="org-member">${getFullName(m)} ${m.poste?`<small class="text-muted">(${m.poste})</small>`:''}</div>`).join('')}</div>`;
             html += `</div>`;
         }
         document.getElementById('tabOrganigramme').innerHTML = html;
@@ -1337,7 +1345,7 @@
             const c = collaborators.find(co => co.id === r.collaboratorId);
             const com = comments.find(co => co.collaboratorId === r.collaboratorId && co.date === r.date);
             const h = computeHeuresNettes(r.collaboratorId, r.date);
-            return { ...r, collabName: c?.name || '?', dept: c?.department || '—', commentText: com?.text || '', heures: h };
+            return { ...r, collabName: c?getFullName(c):'?', dept: c?.department || '—', commentText: com?.text || '', heures: h };
         });
         if (filterText) rows = rows.filter(r => r.collabName.toLowerCase().includes(filterText.toLowerCase()));
         if (filterStatus === 'complet') rows = rows.filter(r => r.arrivee?.signe && r.depart?.signe);
@@ -1382,7 +1390,7 @@
             const c = collaborators.find(co => co.id === r.collaboratorId);
             const h = computeHeuresNettes(r.collaboratorId, r.date);
             const depMin = h ? Math.round(h.depassement * 60) : 0;
-            return { 'Collaborateur': c?.name || '?', 'Opération': c?.department || '—', 'Date': r.date, 'Arrivée': r.arrivee?.time || '—', 'Arrivée signée': r.arrivee?.signe ? 'Oui' : 'Non', 'Départ': r.depart?.time || '—', 'Départ signé': r.depart?.signe ? 'Oui' : 'Non', 'Temps brut': h ? formatHeures(h.brutes) : '—', 'Dépassement pause (min)': depMin, 'Temps net': h ? formatHeures(h.nettes) : '—' };
+            return { 'Collaborateur': c?getFullName(c):'?', 'Opération': c?.department || '—', 'Date': r.date, 'Arrivée': r.arrivee?.time || '—', 'Arrivée signée': r.arrivee?.signe ? 'Oui' : 'Non', 'Départ': r.depart?.time || '—', 'Départ signé': r.depart?.signe ? 'Oui' : 'Non', 'Temps brut': h ? formatHeures(h.brutes) : '—', 'Dépassement pause (min)': depMin, 'Temps net': h ? formatHeures(h.nettes) : '—' };
         });
         if (data.length === 0) return alert('Aucune donnée');
         const wb = XLSX.utils.book_new();
@@ -1422,7 +1430,7 @@
     function showAddPointageModal() {
         const today = getTodayStr();
         const now = getNowStr();
-        const html = `<select id="ptCollab" class="form-select">${collaborators.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
+        const html = `<select id="ptCollab" class="form-select">${collaborators.map(c=>`<option value="${c.id}">${getFullName(c)}</option>`).join('')}</select>
             <input id="ptDate" type="date" class="form-control mt-2" value="${today}">
             <select id="ptType" class="form-select mt-2"><option value="arrivee">Arrivée</option><option value="depart">Départ</option></select>
             <input id="ptTime" type="time" class="form-control mt-2" value="${now}">
@@ -1464,14 +1472,14 @@
         let html = `<div class="d-flex justify-content-between align-items-center mb-3"><h5 style="font-weight:700;margin:0;">Absences</h5><button class="btn btn-primary btn-sm" onclick="showAddAbsenceModal()" style="border-radius:40px;padding:8px 20px;">Déclarer</button></div><table class="table table-modern"><thead><tr><th>Collaborateur</th><th>Début</th><th>Fin</th><th>Type</th><th>Motif</th><th style="text-align:right;">Action</th></tr></thead><tbody>`;
         absences.forEach(a => {
             const c = collaborators.find(c => c.id === a.collaboratorId);
-            html += `<tr><td>${c?.name||'?'}</td><td>${a.startDate}</td><td>${a.endDate}</td><td>${a.type}</td><td>${a.reason||''}</td><td style="text-align:right;"><button class="btn btn-xs btn-danger" onclick="deleteAbsence('${a.id}')">Supprimer</button></td></tr>`;
+            html += `<tr><td>${c?getFullName(c):'?'}</td><td>${a.startDate}</td><td>${a.endDate}</td><td>${a.type}</td><td>${a.reason||''}</td><td style="text-align:right;"><button class="btn btn-xs btn-danger" onclick="deleteAbsence('${a.id}')">Supprimer</button></td></tr>`;
         });
         html += `</tbody></table>`;
         document.getElementById('tabAbsences').innerHTML = html;
     }
 
     function showAddAbsenceModal() {
-        const options = collaborators.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        const options = collaborators.map(c => `<option value="${c.id}">${getFullName(c)}</option>`).join('');
         const html = `<select id="absCollab" class="form-select">${options}</select>
             <input id="absStart" type="date" class="form-control mt-2" value="${getTodayStr()}">
             <input id="absEnd" type="date" class="form-control mt-2" value="${getTodayStr()}">
@@ -1501,7 +1509,7 @@
         collaborators.forEach(c => {
             if (c.actif === false) return;
             const com = comments.find(co => co.collaboratorId === c.id && co.date === today);
-            html += `<div class="card-modern p-2 mb-2"><div class="d-flex align-items-center gap-2"><strong>${c.name}</strong><div style="flex:1;"><input type="text" class="form-control form-control-sm" id="com_${c.id}" value="${com ? com.text : ''}" placeholder="Commentaire…"></div><button class="btn btn-sm btn-outline-primary" onclick="saveComment(${c.id})" style="border-radius:40px;">Enregistrer</button><button class="btn btn-sm btn-outline-danger" onclick="deleteComment(${c.id})" style="border-radius:40px;">Effacer</button></div></div>`;
+            html += `<div class="card-modern p-2 mb-2"><div class="d-flex align-items-center gap-2"><strong>${getFullName(c)}</strong><div style="flex:1;"><input type="text" class="form-control form-control-sm" id="com_${c.id}" value="${com ? com.text : ''}" placeholder="Commentaire…"></div><button class="btn btn-sm btn-outline-primary" onclick="saveComment(${c.id})" style="border-radius:40px;">Enregistrer</button><button class="btn btn-sm btn-outline-danger" onclick="deleteComment(${c.id})" style="border-radius:40px;">Effacer</button></div></div>`;
         });
         document.getElementById('tabCommentaires').innerHTML = html;
     }
@@ -1611,7 +1619,7 @@
                 const heuresHtml = h ? `<strong>${formatHeures(h.nettes)}</strong>${h.depassement>0?`<br><small class="text-danger">-${Math.round(h.depassement*60)}min</small>`:''}` : '—';
                 const nbDep = collabPauses.filter(p => p.depassement).length;
                 const depHtml = nbDep ? `<span class="badge bg-danger">${nbDep} dép.</span>` : '—';
-                html += `<tr><td class="text-muted">${idx+1}</td><td><strong>${c.name}</strong><br><small>${c.company||''}</small></td>${cols}<td>${statutHtml}</td><td>${heuresHtml}</td><td>${depHtml}</td></tr>`;
+                html += `<tr><td class="text-muted">${idx+1}</td><td><strong>${getFullName(c)}</strong><br><small>${c.company||''}</small></td>${cols}<td>${statutHtml}</td><td>${heuresHtml}</td><td>${depHtml}</td></tr>`;
             });
             html += `</tbody></table></div></div>`;
         }
@@ -1645,7 +1653,7 @@
                     dureeReelle = `${mins} min`;
                     depMin = Math.max(0, mins - cfg.duree);
                 }
-                data.push({ 'Collaborateur': c.name, 'Opération': c.department || '—', 'Date': filterDate, 'Type': cfg.label, 'Durée autorisée': cfg.duree + ' min', 'Début': p.debut || '—', 'Fin': p.fin || 'En cours', 'Durée réelle': dureeReelle, 'Dépassement (min)': depMin });
+                data.push({ 'Collaborateur': getFullName(c), 'Opération': c.department || '—', 'Date': filterDate, 'Type': cfg.label, 'Durée autorisée': cfg.duree + ' min', 'Début': p.debut || '—', 'Fin': p.fin || 'En cours', 'Durée réelle': dureeReelle, 'Dépassement (min)': depMin });
             });
         });
         const wb = XLSX.utils.book_new();
@@ -1679,7 +1687,7 @@
                 if (h) { hoursMap[p.collaboratorId] = (hoursMap[p.collaboratorId] || 0) + h.nettes; hoursGrossMap[p.collaboratorId] = (hoursGrossMap[p.collaboratorId] || 0) + h.brutes; }
             }
         });
-        const hourLabels = collaborators.filter(c => hoursMap[c.id]).map(c => c.name);
+        const hourLabels = collaborators.filter(c => hoursMap[c.id]).map(c => getFullName(c));
         const hourDataNet = collaborators.filter(c => hoursMap[c.id]).map(c => +hoursMap[c.id].toFixed(2));
         const hourDataGross = collaborators.filter(c => hoursMap[c.id]).map(c => +hoursGrossMap[c.id].toFixed(2));
         document.getElementById('tabRapports').innerHTML = `<div class="d-flex justify-content-between align-items-center mb-3"><h5 style="font-weight:700;margin:0;">Rapports</h5><button class="btn btn-success btn-sm" onclick="exportRapportCompletExcel()" style="border-radius:40px;padding:8px 20px;">Export complet</button></div>
@@ -1704,7 +1712,7 @@
                 const pauseMatin = collabPauses.find(p => p.type === 'matin');
                 const pauseDej = collabPauses.find(p => p.type === 'dejeuner');
                 const pauseAprem = collabPauses.find(p => p.type === 'aprem');
-                data.push({ 'Collaborateur': c.name, 'Opération': c.department || '—', 'Date': date, 'Arrivée': arr?.time || '—', 'Départ': dep?.time || '—', 'Heures brutes': h ? formatHeures(h.brutes) : '—', 'Dépassements (min)': depTotalMin, 'Heures nettes': h ? formatHeures(h.nettes) : '—', 'Pause matin': pauseMatin ? `${pauseMatin.debut}→${pauseMatin.fin||'...'}` : '—', 'Pause déjeuner': pauseDej ? `${pauseDej.debut}→${pauseDej.fin||'...'}` : '—', 'Pause après-midi': pauseAprem ? `${pauseAprem.debut}→${pauseAprem.fin||'...'}` : '—' });
+                data.push({ 'Collaborateur': getFullName(c), 'Opération': c.department || '—', 'Date': date, 'Arrivée': arr?.time || '—', 'Départ': dep?.time || '—', 'Heures brutes': h ? formatHeures(h.brutes) : '—', 'Dépassements (min)': depTotalMin, 'Heures nettes': h ? formatHeures(h.nettes) : '—', 'Pause matin': pauseMatin ? `${pauseMatin.debut}→${pauseMatin.fin||'...'}` : '—', 'Pause déjeuner': pauseDej ? `${pauseDej.debut}→${pauseDej.fin||'...'}` : '—', 'Pause après-midi': pauseAprem ? `${pauseAprem.debut}→${pauseAprem.fin||'...'}` : '—' });
             });
         });
         if (data.length === 0) return alert('Aucune donnée');
@@ -1731,7 +1739,7 @@
             </div>
             <div class="card-modern p-3 mb-3"><h6 style="font-weight:600;">Email admin (récupération)</h6><div class="row g-2"><div class="col"><input type="email" id="adminEmailInput" class="form-control" placeholder="votre@email.com" value="${settings.admin.email||''}"></div><div class="col-auto"><button class="btn btn-outline-primary" onclick="saveAdminEmail()" style="border-radius:40px;padding:8px 24px;">Enregistrer</button></div></div></div>
             <div class="card-modern p-3 mb-3"><h6 style="font-weight:600;">Mode sécurité (TOTP pour collaborateurs)</h6><select id="securityModeSelect" class="form-select" style="max-width:300px;" onchange="changeSecurityMode()"><option value="none" ${settings.securityMode==='none'?'selected':''}>Aucun</option><option value="totp" ${settings.securityMode==='totp'?'selected':''}>TOTP (Google Auth)</option></select></div>
-            <div class="card-modern p-3"><h6 style="font-weight:600;">Codes PIN des collaborateurs</h6><div class="table-responsive"><table class="table table-modern"><thead><tr><th>Collaborateur</th><th>Nouveau PIN</th><th style="text-align:right;">Action</th></tr></thead><tbody>${collaborators.map(c=>`<tr><td>${c.name}</td><td><input type="password" class="form-control form-control-sm" id="pin_${c.id}" maxlength="4" placeholder="4 chiffres" style="max-width:140px;" value="${c.pin||''}"></td><td style="text-align:right;"><button class="btn btn-sm btn-warning" onclick="changeCollabPinFromParams(${c.id})" style="border-radius:40px;">Modifier</button></td></tr>`).join('')}</tbody></table></div></div>`;
+            <div class="card-modern p-3"><h6 style="font-weight:600;">Codes PIN des collaborateurs</h6><div class="table-responsive"><table class="table table-modern"><thead><tr><th>Collaborateur</th><th>Nouveau PIN</th><th style="text-align:right;">Action</th></tr></thead><tbody>${collaborators.map(c=>`<tr><td>${getFullName(c)}</td><td><input type="password" class="form-control form-control-sm" id="pin_${c.id}" maxlength="4" placeholder="4 chiffres" style="max-width:140px;" value="${c.pin||''}"></td><td style="text-align:right;"><button class="btn btn-sm btn-warning" onclick="changeCollabPinFromParams(${c.id})" style="border-radius:40px;">Modifier</button></td></tr>`).join('')}</tbody></table></div></div>`;
         document.getElementById('tabParametres').innerHTML = html;
     }
 
@@ -1875,7 +1883,7 @@
         if (settings.securityMode === 'totp' && !collab.totpActive) {
             totpWarning = `<div class="alert alert-warning mb-3" style="border-radius:var(--radius-sm);"><i class="fas fa-shield-alt me-2"></i> Votre compte nécessite une double authentification. Veuillez contacter l'administrateur pour l'activer.</div>`;
         }
-        document.getElementById('collabDashboard').innerHTML = `<h4 style="font-weight:700;">Bonjour ${collab.name}</h4>${totpWarning}
+        document.getElementById('collabDashboard').innerHTML = `<h4 style="font-weight:700;">Bonjour ${getFullName(collab)}</h4>${totpWarning}
             <div class="mb-2"><span class="badge bg-secondary">${collab.company || '—'}</span></div>
             ${comment?`<div class="alert alert-warning py-2 px-3" style="border-radius:var(--radius-sm);">📝 ${comment.text}</div>`:''}
             <table class="table" style="font-size:0.95rem;"><tr><th style="width:40%;">Statut</th><td>${arrival?'Présent':'Absent'}</td></tr>
@@ -2135,7 +2143,7 @@
         const select = document.getElementById('collabSelect');
         if (select) {
             const actifs = collaborators.filter(c => c.actif !== false);
-            select.innerHTML = '<option value="">-- Choisir --</option>' + actifs.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            select.innerHTML = '<option value="">-- Choisir --</option>' + actifs.map(c => `<option value="${c.id}">${getFullName(c)}</option>`).join('');
         }
         document.getElementById('loginScreen').classList.remove('d-none');
         document.getElementById('searchCollab')?.addEventListener('input', () => renderCollaborateursList());
